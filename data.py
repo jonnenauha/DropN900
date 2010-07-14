@@ -56,20 +56,17 @@ class DataParser:
         # This is a bit retarded looking... meh
         try:
             if data["is_deleted"]:
-                print "is deleted!"
-                print item
                 if data["is_dir"]:
                     if item.tree_item != None:
-                        print "has tree item!"
                         item.tree_item.setExpanded(False)
                         item.tree_item.setIcon(0, QIcon("ui/icons/folder_delete.png"))
-                        item.tree_item.setText(2, "deleted")
+                        item.tree_item.setText(1, "deleted")
                     else:
                         item.mime_type = "deleted_folder"
                 else:
                     if item.tree_item != None:
                         item.tree_item.setIcon(0, QIcon("ui/icons/cancel.png"))
-                        item.tree_item.setText(2, "deleted")
+                        item.tree_item.setText(1, "deleted")
                     else:
                         item.mime_type = "deleted_item"
                 item.modified = "deleted"
@@ -80,7 +77,7 @@ class DataParser:
         image = QImage.fromData(resp.read())
         if image.isNull():
             self.log("ERROR - Failed to generate image from raw data for", image_path)
-            self.thumbs[image_path] = None # So we dont come here again
+            self.tree_controller.thumbs[image_path] = None # So we dont come here again
             return
         pixmap = QPixmap.fromImage(image)
         self.tree_controller.thumbs[image_path] = pixmap
@@ -93,6 +90,12 @@ class DataParser:
             self.ui_handler.manager_ui.label_username.setText(name)
             user_icon = QPixmap("ui/icons/user.png")
             self.ui_handler.manager_ui.label_username_icon.setPixmap(user_icon.scaled(24,24))
+            self.log("Account data recieved")
+        else:
+            self.ui_handler.manager_ui.label_username.setText("unknown user")
+            user_icon = QPixmap("ui/icons/user_white.png")
+            self.ui_handler.manager_ui.label_username_icon.setPixmap(user_icon.scaled(24,24))
+            self.log("Failed to fetch account data, treating as unknown user")
 
         
 """ Collection aka folder data class """
@@ -151,7 +154,8 @@ class Collection:
 
     def is_folder(self):
         return True
-    
+
+    # For debug prints
     def __str__(self):
         print self.name
         print "  Path       : ", self.path
@@ -212,12 +216,13 @@ class Resource:
     def is_folder(self):
         return False
     
+    # For debug prints
     def __str__(self):
         print self.name
         print "  Root : ", self.root
-        print "  Path :", self.name
-        print "  Size :", self.size
-        print "  Mod  :", self.modified
-        print "  Mime :", self.mime_type
-        print "  TREE item  : ", self.tree_item
+        print "  Path : ", self.name
+        print "  Size : ", self.size
+        print "  Mod  : ", self.modified
+        print "  Mime : ", self.mime_type
+        print "  TREE item : ", self.tree_item
         return ""
