@@ -68,12 +68,8 @@ class DropN900(QtCore.QObject):
             self.authenticator = auth.Authenticator(self.get_config())
         try:
             self.request_token = self.authenticator.obtain_request_token()
-            print ">>> RECIEVED TOKEN:"
-            print " >>", self.request_token.key
-            print " >>", self.request_token.secret
             authurl = self.authenticator.build_authorize_url(self.request_token)
             self.ui.load_login(authurl)
-            print authurl
         except AssertionError:
             self.log("Could not init DropBox connection, errors occurred!")
             self.request_token = None
@@ -83,16 +79,13 @@ class DropN900(QtCore.QObject):
             self.log("Cannot continue authentication, request token invalid")
             return
         dropbox_config = self.get_config()
-        print ">>> USING TOKEN:"
-        print " >>", self.request_token.key
-        print " >>", self.request_token.secret
         try:
             access_token = self.authenticator.obtain_access_token(self.request_token, dropbox_config["verifier"])
         except CannotSendRequest, BadStatusLine:
             self.log("Network error with request token: ", str(self.request_token))
             return
         except:
-            self.log("Some raise catched!")
+            self.log("Exceptions occurred!")
             return
         self.store_auth(access_token)
         self.init_dropbox_client(access_token)
@@ -126,6 +119,6 @@ class DropN900(QtCore.QObject):
 
 if __name__ == "__main__":
     app = QtGui.QApplication(sys.argv)
-    dropn900 = DropN900(True) # Remove param to disable debug
+    dropn900 = DropN900(True) # Remove param to disable debug prints
     dropn900.start()
     os._exit(app.exec_())

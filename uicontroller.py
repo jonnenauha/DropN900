@@ -3,7 +3,7 @@ import time
 import os
 
 from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt, QStringList, QTimer, QDir
+from PyQt4.QtCore import Qt, QStringList, QTimer
 from PyQt4.QtGui import QMainWindow, QWidget, QTreeWidgetItem, QDesktopServices
 from PyQt4.QtGui import QImage, QPixmap, QIcon, QImageReader, QMovie
 from PyQt4.QtGui import QInputDialog, QFileDialog, QMessageBox
@@ -101,23 +101,25 @@ class UiController:
         self.manager_ui.action_layout.insertWidget(3, self.loading_widget)
         self.loading_widget.hide()
 
+        # Init loading animation
         self.loading_animation = QMovie("ui/images/loading.gif", "GIF", self.loading_ui.load_animation_label)
         self.loading_animation.setCacheMode(QMovie.CacheAll)
         self.loading_animation.setSpeed(150)
         self.loading_animation.setScaledSize(QtCore.QSize(48,48))
         self.loading_ui.load_animation_label.setMovie(self.loading_animation)
 
+        # Init hide timer and icons for information messages
         self.information_message_timer = QTimer()
         self.information_message_timer.setSingleShot(True)
         self.information_message_timer.timeout.connect(self.hide_information_message)
-
         self.information_icon_ok = QPixmap("ui/icons/check.png").scaled(24,24)
         self.information_icon_error = QPixmap("ui/icons/cancel.png").scaled(24,24)
 
         self.log("UI initialised...")
 
     def show(self):
-        self.main_widget.resize(800, 480)
+        # Nokia N900 screen resolution, full screen
+        self.main_widget.resize(800, 480) 
         self.main_widget.show()
 
     def show_loading_ui(self, message = "", loading = True):
@@ -206,6 +208,8 @@ class UiController:
         self.action_console.setText("Show Console")
         self.stacked_layout.setCurrentWidget(self.last_view)
 
+    # We should not end here in the device as it has ssl libs in place
+    # on windows youll have to have openssl libs in place or login via webauth wont work
     def ssl_errors_occurred(self, reply, errors):
         self.controller.log("NETWORK ERROR - SSL errors while loading", reply.url())
         print ">> SSL ERRORS LIST: ", errors
@@ -238,8 +242,7 @@ class UiController:
         if reply.error() != 0:
             self.controller.log("NETWORK ERROR - Errors occurred while loading page:", reply.errorString())
             self.controller.log(">> Error code", str(reply.error()))
-        if reply.error() == 99:
-            self.controller.log("NETWORK ERROR - 99 reply.ignoreSslErrors() ?!")
+        #if reply.error() == 99:
             #reply.ignoreSslErrors()
 
     def browser_control_clicked(self):
@@ -458,7 +461,6 @@ class TreeController:
             child = QTreeWidgetItem(columns)
             child.setTextAlignment(1, Qt.AlignRight|Qt.AlignVCenter)
 
-            
             # Set icon with mime type, and folder indicator
             self.set_icon(item.mime_type, child)
             if item.is_folder():
@@ -482,11 +484,13 @@ class TreeController:
         sorted_folders = sorted(folders)
         sorted_files = sorted(files)
 
+        # Sort folders by name and add to tree
         sorted_folder_tree_items = []
         for folder_name in sorted_folders:
             sorted_folder_tree_items.append(folders[folder_name].tree_item)
         parent.tree_item.addChildren(sorted_folder_tree_items)
 
+        # Sort files by name and add to tree
         sorted_file_tree_items = []
         for file_name in sorted_files:
             sorted_file_tree_items.append(files[file_name].tree_item)
