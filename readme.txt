@@ -47,10 +47,23 @@ Known bugs
 
 I have tested the app on my Nokia N900 (PR1.2) with latest PyQt4 and found the following:
 
-#001 Download/upload dialogs - Status: Not Fixed, waiting for PyQt4 fix or will make a custom dialog
+#001 Download/upload dialogs
+  
   PyQt4.QFileDialog.getExistingDirectory() and PyQt4.QFileDialog.getOpenFileName() 
   both show strange names on titles etc. These dialogs are used when downloading/uploading files.
   They are usable but not very pretty. This seems to be a bug in PyQt4.
+  
+  Status: Not Fixed
+  Suggestion: Waiting for PyQt4 fix or will make a custom dialog
+  
+#002 Fail to obtain access token after web browser authentication
+
+  http lib exceptions from python-dropbox-client code once calling Authenticator.obtain_access_token()
+  with authenticated request token. Bug is quite random, sometimes happens sometimes not, cant
+  figure a pattern out.
+  
+  Status: Not fixed
+  Suggestion: Get mobile auth access to dropbox so we can skip playing around with separate web browser auth
 
 Contact
 =======
