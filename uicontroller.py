@@ -10,9 +10,10 @@ from PyQt4.QtGui import QInputDialog, QFileDialog, QMessageBox
 from PyQt4.QtNetwork import QNetworkReply, QNetworkRequest
 
 from ui.ui_mainwindow import Ui_DropN900Widget
-from ui.ui_login import Ui_LoginWidget
-from ui.ui_manager import Ui_ManagerWidget
-from ui.ui_console import Ui_ConsoleWidget
+from ui.ui_loginwidget import Ui_LoginWidget
+from ui.ui_browserwidget import Ui_BrowserWidget
+from ui.ui_managerwidget import Ui_ManagerWidget
+from ui.ui_consolewidget import Ui_ConsoleWidget
 from ui.ui_loadingwidget import Ui_LoadingWidget
 
 """ UiController controls ui view switching and ui interactions """
@@ -46,22 +47,31 @@ class UiController:
         action_reset_auth.triggered.connect(self.controller.reset_auth)
         action_exit.triggered.connect(self.shut_down)
         
+        ### Browser Widget
+        self.browser_widget = QWidget()
+        self.browser_ui = Ui_BrowserWidget()
+        self.browser_ui.setupUi(self.browser_widget)
+
+        # Connects
+        self.browser_ui.button_done.clicked.connect(self.browser_control_clicked)
+        self.browser_ui.url_line_edit.returnPressed.connect(self.webview_load_url)
+        self.browser_ui.webview.loadStarted.connect(self.webview_load_started)
+        self.browser_ui.webview.loadProgress.connect(self.webview_load_progress)
+        self.browser_ui.webview.loadFinished.connect(self.webview_load_finished)
+        
+        network_manager = self.browser_ui.webview.page().networkAccessManager()
+        network_manager.sslErrors.connect(self.ssl_errors_occurred)
+        network_manager.finished.connect(self.load_reply_recieved)
+
         ### Login Widget
         self.login_widget = QWidget()
         self.login_ui = Ui_LoginWidget()
         self.login_ui.setupUi(self.login_widget)
+        self.authurl = None
 
         # Connects
-        self.login_ui.button_done.clicked.connect(self.browser_control_clicked)
-        self.login_ui.url_line_edit.returnPressed.connect(self.webview_load_url)
-        self.login_ui.webview.loadStarted.connect(self.webview_load_started)
-        self.login_ui.webview.loadProgress.connect(self.webview_load_progress)
-        self.login_ui.webview.loadFinished.connect(self.webview_load_finished)
+        self.login_ui.button_action.clicked.connect(self.login_button_clicked)
         
-        network_manager = self.login_ui.webview.page().networkAccessManager()
-        network_manager.sslErrors.connect(self.ssl_errors_occurred)
-        network_manager.finished.connect(self.load_reply_recieved)
-
         ### Manager Widget
         self.manager_widget = QWidget()
         self.manager_ui = Ui_ManagerWidget()
@@ -83,6 +93,7 @@ class UiController:
         self.manager_ui.button_new_folder.clicked.connect(self.item_new_folder)
 
         ### Fill stacked layout
+        self.stacked_layout.addWidget(self.browser_widget)
         self.stacked_layout.addWidget(self.login_widget)
         self.stacked_layout.addWidget(self.manager_widget)
 
@@ -159,13 +170,23 @@ class UiController:
         self.manager_ui.thumb_container.setVisible(self.thumb_was_visible)
 
     def load_login(self, authurl):
-        self.switch_context("browser")
-        self.login_ui.url_line_edit.setText(QtCore.QUrl(authurl).toString())        
-        self.webview_load_url()
+        self.switch_context("login")
+        self.authurl = authurl
+
+    def login_button_clicked(self):
+        if self.authurl != None:
+            if QDesktopServices.openUrl(QtCore.QUrl(self.authurl)):
+                self.authurl = None
+                self.login_ui.label_info.setText("When you have completed the login in the web browser click the button below")
+                self.login_ui.button_action.setText("I'm done authenticating, lets go!")
+        else:
+            self.controller.end_auth()
 
     def switch_context(self, view = None):
         widget = None
         if view == "browser":
+            widget = self.browser_widget
+        if view == "login":
             widget = self.login_widget
         if view == "manager":
             widget = self.manager_widget
@@ -216,34 +237,32 @@ class UiController:
         
     def webview_load_url(self, url = None):
         if url == None:
-            url = QtCore.QUrl(self.login_ui.url_line_edit.text())
+            url = QtCore.QUrl(self.browser_ui.url_line_edit.text())
         else:
             url = QtCore.QUrl(url)
-        self.login_ui.webview.load(url)
+        self.browser_ui.webview.load(url)
 
     def webview_load_started(self):
-        self.login_ui.webview_status_label.setText("Loading...")
+        self.browser_ui.webview_status_label.setText("Loading...")
 
     def webview_load_progress(self, progress):
-        self.login_ui.webview_status_label.setText("Loading... " + str(progress) + "%")
+        self.browser_ui.webview_status_label.setText("Loading... " + str(progress) + "%")
         
     def webview_load_finished(self, succesfull):
         if succesfull:
             status = "Page loaded"
         else:
             status = "Page load failed"
-        self.login_ui.webview_status_label.setText(status)
-        self.login_ui.url_line_edit.setText(self.login_ui.webview.url().toString())
+        self.browser_ui.webview_status_label.setText(status)
+        self.browser_ui.url_line_edit.setText(self.browser_ui.webview.url().toString())
 
     def load_reply_recieved(self, reply):
         attr_redir = reply.attribute(QNetworkRequest.RedirectionTargetAttribute)
         if not attr_redir.isNull():
-            self.login_ui.webview_status_label.setText("Redirecting...")
+            self.browser_ui.webview_status_label.setText("Redirecting...")
         if reply.error() != 0:
-            self.controller.log("NETWORK ERROR - Errors occurred while loading page:", reply.errorString())
+            self.controller.log("NETWORK ERROR -", reply.errorString())
             self.controller.log(">> Error code", str(reply.error()))
-        #if reply.error() == 99:
-            #reply.ignoreSslErrors()
 
     def browser_control_clicked(self):
         if self.controller.connected:
@@ -254,9 +273,9 @@ class UiController:
     def open_item_link(self):
         url = self.manager_ui.public_link_line_edit.text()
         self.webview_load_url(url)
-        self.login_ui.label_info.hide()
-        self.login_ui.button_done.setText("Back")
-        self.login_ui.button_done.setIcon(QIcon("ui/icons/back.png"))
+        self.browser_ui.label_info.hide()
+        self.browser_ui.button_done.setText("Back")
+        self.browser_ui.button_done.setIcon(QIcon("ui/icons/back.png"))
         self.switch_context("browser")
 
     def item_download(self):

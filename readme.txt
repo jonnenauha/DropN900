@@ -8,7 +8,7 @@ I wanted to make one. I use the dropbox provided python API client and PyQt4.
 Current capabilities
 ====================
 
-- In app web authentication, you only give your password to the dropbox website, 
+- Web authentication to dropbox, you only give your password to the dropbox website, 
   the DropN900 app will never see it or store it. An OAuth access token is stored and 
   reused so the user wont have to authenticate on every session.
   
@@ -16,9 +16,9 @@ Current capabilities
   * DropBox does not automatically let you roam free on users root folder. 
     This access has to be requested and I'm in the process of doing this.
 
-- Create new folder, rename file/folder, upload file, download file, remove file/folder
+- Create new folder, rename file/folder, upload file, download file, remove file/folder.
 
-- Image file thumbnail preview
+- Image file thumbnail preview, loading animations and showing results for actions.
 
 - Threaded networking (non-bloking) so you'll have a smooth user experience while
   network I/O is happening. Otherwise ui would freeze on all calls to the dropbox

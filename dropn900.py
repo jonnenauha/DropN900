@@ -71,21 +71,21 @@ class DropN900(QtCore.QObject):
             authurl = self.authenticator.build_authorize_url(self.request_token)
             self.ui.load_login(authurl)
         except AssertionError:
-            self.log("Could not init DropBox connection, errors occurred!")
+            self.log("ERROR - Could not init DropBox connection, errors occurred!")
             self.request_token = None
 
     def end_auth(self):
         if not self.request_token:
-            self.log("Cannot continue authentication, request token invalid")
+            self.log("WARNING - Cannot continue authentication, request token invalid. Restart DropN900!")
             return
         dropbox_config = self.get_config()
         try:
             access_token = self.authenticator.obtain_access_token(self.request_token, dropbox_config["verifier"])
         except CannotSendRequest, BadStatusLine:
-            self.log("Network error with request token: ", str(self.request_token))
+            self.log("ERROR - httplib exception catched from dropbox client code while obtaining access token!")
             return
         except:
-            self.log("Exceptions occurred!")
+            self.log("ERROR - Unkown exceptions occurred while obtaining access token!")
             return
         self.store_auth(access_token)
         self.init_dropbox_client(access_token)
