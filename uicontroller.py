@@ -289,7 +289,7 @@ class UiController:
 
         # This dialog shows strange stuff on maemo5
         # It's a PyQt4 bug and its the best we got, you can cope with this
-        local_folder_path = QFileDialog.getExistingDirectory(None, "Select Download Folder", "/home/user", QFileDialog.ShowDirsOnly|QFileDialog.HideNameFilterDetails|QFileDialog.ReadOnly)
+        local_folder_path = QFileDialog.getExistingDirectory(None, "Select Download Folder", "/home/user/DropN900", QFileDialog.ShowDirsOnly|QFileDialog.HideNameFilterDetails|QFileDialog.ReadOnly)
         if local_folder_path.isEmpty():
             return
         
@@ -343,23 +343,6 @@ class UiController:
             new_name = data.parent + "/" + new_name
         self.controller.connection.rename(data.root, data.path, str(new_name), data)
 
-    def is_name_valid(self, name, item_type):
-        if name.isEmpty() or name.isNull():
-            return False
-        if name.contains("/"):
-            self.show_information_ui("Cant use / in new " + item_type + " name", False)
-            return False
-        if name.contains("\\"):
-            self.show_information_ui("Cant use \ in new " + item_type + " name", False)
-            return False
-        if name.startsWith(" "):
-            self.show_information_ui("New " + item_type + " name cant start with a space", False)
-            return False
-        if name.endsWith(" "):
-            self.show_information_ui("New " + item_type + " name cant end with a space", False)
-            return False
-        return True
-
     def item_remove(self):
         data = self.get_selected_data()
         if data == None:
@@ -382,13 +365,27 @@ class UiController:
         new_folder_name, ok = QInputDialog.getText(None, "Give new folder name", "")
         if not ok:
             return
-        if new_folder_name.isEmpty() or new_folder_name.isNull():
+        if not self.is_name_valid(new_folder_name, "folder")
             return
-        if new_folder_name.contains("/"):
-            return # show error here
-
         full_create_path = data.path + "/" + str(new_folder_name)
         self.controller.connection.create_folder(data.root, full_create_path, str(new_folder_name), data.path)
+
+    def is_name_valid(self, name, item_type):
+        if name.isEmpty() or name.isNull():
+            return False
+        if name.contains("/"):
+            self.show_information_ui("Cant use / in new " + item_type + " name", False)
+            return False
+        if name.contains("\\"):
+            self.show_information_ui("Cant use \ in new " + item_type + " name", False)
+            return False
+        if name.startsWith(" "):
+            self.show_information_ui("New " + item_type + " name cant start with a space", False)
+            return False
+        if name.endsWith(" "):
+            self.show_information_ui("New " + item_type + " name cant end with a space", False)
+            return False
+        return True
 
 
 """ TreeController handler all the interaction to/from the main QTreeWidget """

@@ -19,18 +19,24 @@ class DropN900(QtCore.QObject):
         self.ui = UiController(self, debug_enabled)
         self.connection = ConnectionManager(self, self.ui)
         self.ui.tree_controller.set_connection(self.connection)
-
-        self.reset_variables()
-
+        
     def start(self):
         self.ui.show()
+        self.reset_variables()
+        self.check_for_data_folder()
         self.check_for_auth("token.ini")
 
     def reset_variables(self):
         self.authenticator = None
         self.request_token = None
         self.connected = False
-        
+
+    def check_for_data_folder(self):
+        home_dir = QtCore.QDir.home()
+        if home_dir.absolutePath() == "/home/user":
+            if not home_dir.cd("DropN900"):
+                home_dir.mkdir("DropN900")
+                
     def check_for_auth(self, file):
         token_config = SafeConfigParser()
         token_config.read(file)

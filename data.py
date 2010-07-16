@@ -1,7 +1,6 @@
 
 from PyQt4.QtGui import QIcon, QPixmap, QImage
 
-import pprint
 """ DataParser gets data from network layer, converts
     to app format and sends onwards to ui layer """
 
@@ -13,16 +12,10 @@ class DataParser:
         self.controller = ui_handler.controller
         self.log = self.ui_handler.controller.log
 
-        self.pp = pprint.PrettyPrinter(indent=2)
-
     def parse_metadata(self, data, opened_folders):
         tree_item = None
         if data == None:
             return tree_item
-
-        #print ""
-        #self.pp.pprint(data)
-        #print ""
      
         if data["is_dir"]:
             parent_root = data["root"]
@@ -70,7 +63,7 @@ class DataParser:
         return tree_item
 
     def check_deleted(self, data, item, tree_item = None):
-        # This is a bit retarded looking... meh
+        # This is a bit retarded looking... meh, will remove at some point
         try:
             if data["is_deleted"]:
                 if data["is_dir"]:
