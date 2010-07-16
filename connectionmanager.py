@@ -15,6 +15,7 @@ class ConnectionManager:
         self.controller = controller
         self.data_parser = DataParser(ui_handler)
         self.ui_handler = ui_handler
+        self.tree_controller = ui_handler.tree_controller
         self.log = controller.log
         self.client = None
 
@@ -61,23 +62,24 @@ class ConnectionManager:
     def show_information(self, message, succesfull):
         self.ui_handler.show_information_ui(message, succesfull)
 
+    def get_automated_metadata(self, folder_path, root):
+        folder = self.tree_controller.get_folder_for_path(folder_path)
+        if folder == None:
+            return
+        self.tree_controller.tree.setCurrentItem(folder.tree_item)
+        self.tree_controller.start_load_anim(folder)
+        # Leave for later
+        #self.store_opened_folders(path)
+        self.get_metadata(folder_path, root, None, True)
+            
     ### METADATA HANDLERS
-    def get_metadata(self, path, root, hashcode = None):
+    def get_metadata(self, path, root, hashcode = None, automated = False):
         if not self.check_client:
             return
 
-        # Loading ui start
-        key_word = "Loading" if hashcode == None else "Refreshing"
-        if path != "/":
-            self.show_loading_ui(key_word + " content of \nDropN900" + path)
-        elif root == "sandbox":
-            self.show_loading_ui(key_word + " root content of \nDropN900")
-        elif root == "dropbox":
-            self.show_loading_ui(key_word + " root content of \nDropBox")
-        else:
-            self.log("ERROR - Get metadata path/root parse error! Cannot continue.")
-            return
-
+        if not automated:
+            self.updated_open_folders = {}
+            
         # Make thread
         worker = NetworkWorker()
         worker.set_callable(self.client.metadata, root, path, 10000, hashcode)
@@ -86,20 +88,37 @@ class ConnectionManager:
 
         # Add thread to watch list
         self.running_threads.append(worker)
-
+        
     def get_metadata_callback(self, resp):
+        tree_item = None
         if resp != None:
-            self.hide_loading_ui()
-            if resp.status != 304: # content hasnt changed
+            if resp.status != 304: # content hasn't changed
                 if resp.status == 200: # ok
-                    self.data_parser.parse_metadata(resp.data)
+                    tree_item = self.data_parser.parse_metadata(resp.data, self.updated_open_folders)
                 else:
                     self.log("NETWORK ERROR "+str(resp.status)+" - Could not fetch metadata")
                     self.log(">> ", resp.body)
                     self.show_information("Metadata fetch failed, network error", False)
         else:
-            self.hide_loading_ui()
-            self.show_information("Metadata fetch failed, internal error", False)        
+            self.show_information("Metadata fetch failed, internal error", False)
+
+        # Got new metadata ui was updated
+        tree_controller = self.ui_handler.tree_controller
+        if tree_item != None: 
+            tree_controller.stop_load_anim(tree_item)
+        # Content not changed or error fetching
+        else:
+           tree_controller.stop_all_load_anims()
+
+    def store_opened_folders(self, path):
+        self.updated_open_folders = {}
+        folder = self.tree_controller.get_folder_for_path(path)
+        if folder != None:
+            for child_folder in folder.get_folders():
+                if child_folder.tree_item.isExpanded():
+                    self.updated_open_folders[child_folder.get_name()] = child_folder.path
+        else:
+            self.log("ERROR - Could not find tree item for path", path)
 
     ### GET THUMBNAIL HANDLERS
     def get_thumbnail(self, path, root, size):
@@ -206,7 +225,7 @@ class ConnectionManager:
             file_name = params[2]
             self.hide_loading_ui()
             if resp.status == 200:
-                self.get_metadata(store_path, root)
+                self.get_automated_metadata(store_path, root)
                 self.show_information("Upload of " + file_name + " completed", True)
             else:
                 self.log("NETWORK ERROR "+str(resp.status)+" - Upload of " + params[0] + " to " + store_path + "failed.")
@@ -217,16 +236,18 @@ class ConnectionManager:
             self.show_information("Upload failed, internal error", False)
 
     ### RENAME HANDLERS
-    def rename(self, root, from_path, to_path, update_path):
-        # Show loading ui
+    def rename(self, root, from_path, to_path, data):
+        # Start rename loading anim
+        data.set_loading(True)
+
+        # Parse names from paths
         old_name = from_path.split("/")[-1]
         new_name = to_path.split("/")[-1]
-        self.show_loading_ui("Renaming file " + old_name + "\nto " + new_name)
-        
+
         # Make thread
         worker = NetworkWorker()
         worker.set_callable(self.client.file_move, root, from_path, to_path)
-        worker.set_callback(self.rename_callback, root, update_path, old_name)
+        worker.set_callback(self.rename_callback, old_name, new_name, data)
         worker.start()
 
         # Add thread to watch list
@@ -234,19 +255,21 @@ class ConnectionManager:
 
     def rename_callback(self, resp, params):
         if resp != None and params[0] != None and params[1] != None and params[2] != None:
-            root = params[0]
-            update_parent = params[1]
-            old_name = params[2]
-            self.hide_loading_ui()
+            old_name = params[0]
+            new_name = params[1]
+            data = params[2]
+            # Set new name to tree item
             if resp.status == 200:
-                self.get_metadata(update_parent, root)
+                data.refresh_name_data(resp.data["path"])
+                data.tree_item.setText(0, new_name)
                 self.show_information("Renamed " + old_name + " succesfully", True)
             else:
                 self.log("NETWORK ERROR "+str(resp.status)+" - Renaming failed.")
                 self.log(">> Reason:", resp.body)
                 self.show_information("Renaming of " + old_name + " failed, network error", False)
+            # Stop rename loading anim
+            data.set_loading(False)
         else:
-            self.hide_loading_ui()
             self.show_information("Renaming failed, internal error", False)
 
     ### REMOVE HANDLERS
@@ -274,7 +297,7 @@ class ConnectionManager:
             keyword = "file " if not is_folder else "folder "
             self.hide_loading_ui()
             if resp.status == 200:
-                self.get_metadata(update_path, root)
+                self.get_automated_metadata(update_path, root)
                 self.show_information("Removed " + keyword + removed_file + " succesfully", True)
             else:
                 self.log("NETWORK ERROR "+str(resp.status)+" - Removing " + keyword + removed_file + " from " + update_path + " failed.")
@@ -313,7 +336,7 @@ class ConnectionManager:
             update_path = params[3]
             self.hide_loading_ui()
             if resp.status == 200:
-                self.get_metadata(update_path, root)
+                self.get_automated_metadata(update_path, root)
                 self.show_information("Created folder " + folder_name + " succesfully", True)
             else:
                 self.log("NETWORK ERROR "+str(resp.status)+" - Could not create folder " + full_create_path)

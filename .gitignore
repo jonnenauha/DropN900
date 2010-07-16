@@ -1,2 +1,6 @@
 *.pyc
 *.ini
+
+dropbox
+oauth
+poster

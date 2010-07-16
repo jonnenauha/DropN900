@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'managerwidget.ui'
 #
-# Created: Thu Jul 15 03:23:37 2010
+# Created: Fri Jul 16 06:31:39 2010
 #      by: PyQt4 UI code generator 4.7.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -25,14 +25,119 @@ class Ui_ManagerWidget(object):
 "    background-color: transparent;\n"
 "}\n"
 "\n"
-"QTreeWidget#tree_widget {\n"
-"    background-color: transparent;\n"
+"QPushButton {\n"
+"    min-height: 60px;\n"
+"    border-radius: 0px;\n"
+"    border: 2px solid rgba(255,255,255,200);\n"
+"    border-left: 0px;\n"
+"    color: rgb(230, 230, 230);\n"
+"    background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, stop:0 rgba(16, 16, 16, 255), stop:0.5 rgba(55, 55, 55, 210), stop:1 rgba(36, 36, 36, 255));\n"
+"}\n"
+"\n"
+"QPushButton:hover {\n"
+"    color: white;\n"
+"}\n"
+"\n"
+"QPushButton:pressed {\n"
+"    background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, stop:0 rgba(59, 59, 59, 255), stop:0.5 rgba(82, 82, 82, 255), stop:1 rgba(68, 68, 68, 255));\n"
+"    color: #0099FF;\n"
+"}\n"
+"\n"
+"QPushButton::disabled {\n"
+"    color: grey;\n"
+"    background-color: black;\n"
+"}\n"
+"\n"
+"QPushButton#button_download {\n"
+"    border-top-left-radius: 0px;\n"
+"    border-top-right-radius: 0px;\n"
+"}\n"
+"\n"
+"QPushButton#button_new_folder {\n"
+"    border-bottom-left-radius: 0px;\n"
+"    border-bottom-right-radius: 15px;\n"
+"}\n"
+"\n"
+"QPushButton#button_remove {\n"
+"    border-top: 0px;\n"
+"    border-right: 0px;\n"
+"}\n"
+"\n"
+"QPushButton#button_rename, #button_new_folder, #button_upload {\n"
+"    border-top: 0px;\n"
+"}\n"
+"\n"
+"QPushButton#button_rename {\n"
+"    border-left: 2px solid rgba(255,255,255,200);\n"
+"}\n"
+"\n"
+"QTreeWidget {\n"
+"    show-decoration-selected: 1;\n"
+"    background-color: black;\n"
+"    alternate-background-color: rgb(36, 36, 36);\n"
+"    color: rgb(235, 235, 235);\n"
 "    font-size: 15px;\n"
 "    border: 0px;\n"
 "    border-bottom: 2px solid rgba(255,255,255,200);\n"
 "    border-right: 2px solid rgba(255,255,255,200);\n"
-"    border-bottom-right-radius: 10px;\n"
-"    padding-bottom: 5px;\n"
+"    border-top: 2px solid rgba(255,255,255,200);\n"
+"    border-bottom-right-radius: 15px;\n"
+"    padding-bottom: 10px;\n"
+"}\n"
+"\n"
+"QTreeWidget::item {\n"
+"    background-color: transparent;\n"
+"    border: 0px;\n"
+"    height: 50px;\n"
+"    min-height: 50px;\n"
+"    max-height: 50px;\n"
+"    padding-left: 5px;\n"
+"}\n"
+"\n"
+"QTreeView::item:selected {\n"
+"    background-color: #404040;\n"
+"    border: 0px;\n"
+"}\n"
+"\n"
+"QTreeView::branch {\n"
+"    border: 0px;\n"
+"}\n"
+"\n"
+"QTreeView::branch:selected {\n"
+"    background-color: #404040;\n"
+"    border: 0px;\n"
+"}\n"
+"\n"
+"QTreeView::branch:has-siblings:!adjoins-item {\n"
+"    border-image: url(ui/images/vline.png) 0;\n"
+"}\n"
+"\n"
+"QTreeView::branch:has-siblings:adjoins-item {\n"
+"    border-image: url(ui/images/hmid.png) 0;\n"
+"}\n"
+"\n"
+"QTreeView::branch:!has-children:!has-siblings:adjoins-item {\n"
+"    border-image: url(ui/images/hend.png) 0;\n"
+"}\n"
+"\n"
+"QTreeView::branch:has-children:!has-siblings:closed {\n"
+"    border-image: none;\n"
+"    image: url(ui/images/arrow_right_small.png);\n"
+"}\n"
+"\n"
+"QTreeView::branch:closed:has-children:has-siblings {\n"
+"    border-image: url(ui/images/vline-cap.png) 0;\n"
+"    image: url(ui/images/arrow_right_small.png);\n"
+"}\n"
+"\n"
+"QTreeView::branch:open:has-children:!has-siblings {\n"
+"    border-image: none;\n"
+"    image: url(ui/images/arrow_down_small.png);\n"
+"}\n"
+"\n"
+"QTreeView::branch:open:has-children:has-siblings  {\n"
+"    border-image: url(ui/images/vline-cap.png) 0;\n"
+"    image: url(ui/images/arrow_down_small.png);\n"
 "}")
         self.horizontalLayout_2 = QtGui.QHBoxLayout(ManagerWidget)
         self.horizontalLayout_2.setSpacing(0)
@@ -48,12 +153,14 @@ class Ui_ManagerWidget(object):
         self.tree_widget.setFrameShape(QtGui.QFrame.StyledPanel)
         self.tree_widget.setFrameShadow(QtGui.QFrame.Sunken)
         self.tree_widget.setLineWidth(1)
+        self.tree_widget.setAlternatingRowColors(True)
+        self.tree_widget.setIndentation(25)
         self.tree_widget.setUniformRowHeights(True)
         self.tree_widget.setAnimated(True)
         self.tree_widget.setObjectName("tree_widget")
         self.tree_widget.header().setVisible(True)
         self.tree_widget.header().setDefaultSectionSize(300)
-        self.tree_widget.header().setMinimumSectionSize(75)
+        self.tree_widget.header().setMinimumSectionSize(40)
         self.verticalLayout.addWidget(self.tree_widget)
         self.frame_controls_bottom = QtGui.QFrame(ManagerWidget)
         self.frame_controls_bottom.setFrameShape(QtGui.QFrame.NoFrame)
@@ -108,63 +215,70 @@ class Ui_ManagerWidget(object):
         self.horizontalLayout.addLayout(self.verticalLayout)
         self.horizontalLayout_2.addLayout(self.horizontalLayout)
         self.frame_controls_right = QtGui.QFrame(ManagerWidget)
-        self.frame_controls_right.setMinimumSize(QtCore.QSize(275, 0))
+        self.frame_controls_right.setMinimumSize(QtCore.QSize(300, 0))
         self.frame_controls_right.setMaximumSize(QtCore.QSize(275, 16777215))
         self.frame_controls_right.setFrameShape(QtGui.QFrame.NoFrame)
         self.frame_controls_right.setLineWidth(0)
         self.frame_controls_right.setObjectName("frame_controls_right")
         self.verticalLayout_2 = QtGui.QVBoxLayout(self.frame_controls_right)
         self.verticalLayout_2.setSpacing(0)
-        self.verticalLayout_2.setMargin(8)
+        self.verticalLayout_2.setContentsMargins(0, 0, 0, 8)
         self.verticalLayout_2.setObjectName("verticalLayout_2")
         self.button_download = QtGui.QPushButton(self.frame_controls_right)
         font = QtGui.QFont()
-        font.setPointSize(15)
+        font.setFamily("Arial")
+        font.setPointSize(16)
         self.button_download.setFont(font)
         self.button_download.setStyleSheet("None")
         self.button_download.setObjectName("button_download")
         self.verticalLayout_2.addWidget(self.button_download)
-        self.horizontalLayout_5 = QtGui.QHBoxLayout()
-        self.horizontalLayout_5.setSpacing(0)
-        self.horizontalLayout_5.setObjectName("horizontalLayout_5")
+        self.layout_buttons = QtGui.QHBoxLayout()
+        self.layout_buttons.setSpacing(0)
+        self.layout_buttons.setObjectName("layout_buttons")
         self.button_remove = QtGui.QPushButton(self.frame_controls_right)
         font = QtGui.QFont()
-        font.setPointSize(15)
+        font.setFamily("Arial")
+        font.setPointSize(16)
         self.button_remove.setFont(font)
         self.button_remove.setObjectName("button_remove")
-        self.horizontalLayout_5.addWidget(self.button_remove)
+        self.layout_buttons.addWidget(self.button_remove)
         self.button_rename = QtGui.QPushButton(self.frame_controls_right)
         font = QtGui.QFont()
-        font.setPointSize(15)
+        font.setFamily("Arial")
+        font.setPointSize(16)
         self.button_rename.setFont(font)
         self.button_rename.setObjectName("button_rename")
-        self.horizontalLayout_5.addWidget(self.button_rename)
-        self.verticalLayout_2.addLayout(self.horizontalLayout_5)
-        self.horizontalLayout_6 = QtGui.QHBoxLayout()
-        self.horizontalLayout_6.setSpacing(0)
-        self.horizontalLayout_6.setObjectName("horizontalLayout_6")
-        self.button_new_folder = QtGui.QPushButton(self.frame_controls_right)
-        font = QtGui.QFont()
-        font.setPointSize(15)
-        self.button_new_folder.setFont(font)
-        self.button_new_folder.setObjectName("button_new_folder")
-        self.horizontalLayout_6.addWidget(self.button_new_folder)
+        self.layout_buttons.addWidget(self.button_rename)
+        self.verticalLayout_2.addLayout(self.layout_buttons)
         self.button_upload = QtGui.QPushButton(self.frame_controls_right)
         font = QtGui.QFont()
-        font.setPointSize(15)
+        font.setFamily("Arial")
+        font.setPointSize(16)
         self.button_upload.setFont(font)
         self.button_upload.setObjectName("button_upload")
-        self.horizontalLayout_6.addWidget(self.button_upload)
-        self.verticalLayout_2.addLayout(self.horizontalLayout_6)
+        self.verticalLayout_2.addWidget(self.button_upload)
+        self.button_new_folder = QtGui.QPushButton(self.frame_controls_right)
+        font = QtGui.QFont()
+        font.setFamily("Arial")
+        font.setPointSize(16)
+        self.button_new_folder.setFont(font)
+        self.button_new_folder.setObjectName("button_new_folder")
+        self.verticalLayout_2.addWidget(self.button_new_folder)
         self.action_layout = QtGui.QVBoxLayout()
         self.action_layout.setSpacing(0)
+        self.action_layout.setContentsMargins(8, -1, 8, -1)
         self.action_layout.setObjectName("action_layout")
         spacerItem1 = QtGui.QSpacerItem(1, 10, QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Fixed)
         self.action_layout.addItem(spacerItem1)
         self.thumb_container = QtGui.QLabel(self.frame_controls_right)
+        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Expanding)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.thumb_container.sizePolicy().hasHeightForWidth())
+        self.thumb_container.setSizePolicy(sizePolicy)
         self.thumb_container.setLineWidth(0)
         self.thumb_container.setText("")
-        self.thumb_container.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
+        self.thumb_container.setAlignment(QtCore.Qt.AlignCenter)
         self.thumb_container.setObjectName("thumb_container")
         self.action_layout.addWidget(self.thumb_container)
         spacerItem2 = QtGui.QSpacerItem(1, 10, QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Fixed)
@@ -172,11 +286,12 @@ class Ui_ManagerWidget(object):
         spacerItem3 = QtGui.QSpacerItem(1, 1, QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Expanding)
         self.action_layout.addItem(spacerItem3)
         self.verticalLayout_2.addLayout(self.action_layout)
-        self.horizontalLayout_8 = QtGui.QHBoxLayout()
-        self.horizontalLayout_8.setSpacing(8)
-        self.horizontalLayout_8.setObjectName("horizontalLayout_8")
+        self.layout_user_info = QtGui.QHBoxLayout()
+        self.layout_user_info.setSpacing(8)
+        self.layout_user_info.setContentsMargins(8, -1, 8, -1)
+        self.layout_user_info.setObjectName("layout_user_info")
         spacerItem4 = QtGui.QSpacerItem(1, 24, QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
-        self.horizontalLayout_8.addItem(spacerItem4)
+        self.layout_user_info.addItem(spacerItem4)
         self.label_username = QtGui.QLabel(self.frame_controls_right)
         self.label_username.setMaximumSize(QtCore.QSize(16777215, 24))
         font = QtGui.QFont()
@@ -185,7 +300,7 @@ class Ui_ManagerWidget(object):
         self.label_username.setText("")
         self.label_username.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_username.setObjectName("label_username")
-        self.horizontalLayout_8.addWidget(self.label_username)
+        self.layout_user_info.addWidget(self.label_username)
         self.label_username_icon = QtGui.QLabel(self.frame_controls_right)
         sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -196,8 +311,8 @@ class Ui_ManagerWidget(object):
         self.label_username_icon.setMaximumSize(QtCore.QSize(24, 24))
         self.label_username_icon.setText("")
         self.label_username_icon.setObjectName("label_username_icon")
-        self.horizontalLayout_8.addWidget(self.label_username_icon)
-        self.verticalLayout_2.addLayout(self.horizontalLayout_8)
+        self.layout_user_info.addWidget(self.label_username_icon)
+        self.verticalLayout_2.addLayout(self.layout_user_info)
         self.horizontalLayout_2.addWidget(self.frame_controls_right)
 
         self.retranslateUi(ManagerWidget)
@@ -208,9 +323,9 @@ class Ui_ManagerWidget(object):
         self.tree_widget.headerItem().setText(0, QtGui.QApplication.translate("ManagerWidget", "Name", None, QtGui.QApplication.UnicodeUTF8))
         self.tree_widget.headerItem().setText(1, QtGui.QApplication.translate("ManagerWidget", "Size", None, QtGui.QApplication.UnicodeUTF8))
         self.button_open_public_link.setText(QtGui.QApplication.translate("ManagerWidget", "Open Public Link", None, QtGui.QApplication.UnicodeUTF8))
-        self.button_download.setText(QtGui.QApplication.translate("ManagerWidget", "Download", None, QtGui.QApplication.UnicodeUTF8))
-        self.button_remove.setText(QtGui.QApplication.translate("ManagerWidget", "Remove", None, QtGui.QApplication.UnicodeUTF8))
-        self.button_rename.setText(QtGui.QApplication.translate("ManagerWidget", "Rename", None, QtGui.QApplication.UnicodeUTF8))
-        self.button_new_folder.setText(QtGui.QApplication.translate("ManagerWidget", "New Folder", None, QtGui.QApplication.UnicodeUTF8))
-        self.button_upload.setText(QtGui.QApplication.translate("ManagerWidget", "Upload File", None, QtGui.QApplication.UnicodeUTF8))
+        self.button_download.setText(QtGui.QApplication.translate("ManagerWidget", "DOWNLOAD", None, QtGui.QApplication.UnicodeUTF8))
+        self.button_remove.setText(QtGui.QApplication.translate("ManagerWidget", "REMOVE", None, QtGui.QApplication.UnicodeUTF8))
+        self.button_rename.setText(QtGui.QApplication.translate("ManagerWidget", "RENAME", None, QtGui.QApplication.UnicodeUTF8))
+        self.button_upload.setText(QtGui.QApplication.translate("ManagerWidget", "UPLOAD FILE", None, QtGui.QApplication.UnicodeUTF8))
+        self.button_new_folder.setText(QtGui.QApplication.translate("ManagerWidget", "NEW FOLDER", None, QtGui.QApplication.UnicodeUTF8))
 

@@ -76,7 +76,8 @@ class UiController:
         self.manager_widget = QWidget()
         self.manager_ui = Ui_ManagerWidget()
         self.manager_ui.setupUi(self.manager_widget)
-
+        
+        # Tree Controller
         tree = self.manager_ui.tree_widget
         self.tree_controller = TreeController(tree, self.manager_ui, self.controller.log)
 
@@ -148,6 +149,9 @@ class UiController:
 
     def show_information_ui(self, message, succesfull):
         self.loading_ui.load_animation_label.hide()
+        if self.manager_ui.thumb_container.isVisible():
+            self.thumb_was_visible = True
+            self.manager_ui.thumb_container.hide()
         self.loading_ui.info_label.setText(message)
         if succesfull:
             icon = self.information_icon_ok
@@ -309,16 +313,21 @@ class UiController:
         data = self.get_selected_data()
         if data == None:
             return
+
+        # Get new name from user
         old_name = data.get_name()
         keyword = "file" if not data.is_folder() else "folder"
         new_name, ok = QInputDialog.getText(None, "Renaming " + keyword, "Give new name for " + keyword + " " + old_name, QtGui.QLineEdit.Normal, old_name)
         if not ok:
             return
-        if new_name.isEmpty() or new_name.isNull():
+
+        # Validations
+        if not self.is_name_valid(new_name, keyword):
             return
-        if new_name.contains("/") or new_name == " ":
+        if old_name == str(new_name):
             return
 
+        # Extension will be lost, ask user if he wants to leave it
         q_old_name = QtCore.QString(old_name)
         if q_old_name.contains("."):
             if not new_name.contains("."):
@@ -327,12 +336,30 @@ class UiController:
                 if confirmation == QMessageBox.Yes:
                     new_name.append(format)
 
+        # Get final new path and rename
         if data.parent == "/":
             new_name = data.parent + new_name
         else:
             new_name = data.parent + "/" + new_name
-        self.controller.connection.rename(data.root, data.path, str(new_name), data.parent)
-        
+        self.controller.connection.rename(data.root, data.path, str(new_name), data)
+
+    def is_name_valid(self, name, item_type):
+        if name.isEmpty() or name.isNull():
+            return False
+        if name.contains("/"):
+            self.show_information_ui("Cant use / in new " + item_type + " name", False)
+            return False
+        if name.contains("\\"):
+            self.show_information_ui("Cant use \ in new " + item_type + " name", False)
+            return False
+        if name.startsWith(" "):
+            self.show_information_ui("New " + item_type + " name cant start with a space", False)
+            return False
+        if name.endsWith(" "):
+            self.show_information_ui("New " + item_type + " name cant end with a space", False)
+            return False
+        return True
+
     def item_remove(self):
         data = self.get_selected_data()
         if data == None:
@@ -390,6 +417,9 @@ class TreeController:
 
         # Thumbs init
         self.thumbs = {}
+
+        # Current loading anim list
+        self.load_animations = []
         
         # Connects
         self.tree.itemSelectionChanged.connect(self.item_selection_changed)
@@ -409,6 +439,8 @@ class TreeController:
         
     def set_root_folder(self, root_folder):
         self.tree.clear()
+        self.clear_all_load_animations()
+        
         if self.root_folder != None:
             del self.root_folder
         self.root_folder = root_folder
@@ -427,8 +459,10 @@ class TreeController:
         root_folder.tree_item = root_item
 
         self.generate_children(root_folder)
+        self.add_loading_widgets(root_folder)
 
         self.tree.setCurrentItem(root_item)
+        self.start_load_anim(root_folder)
             
     def update_folder(self, path, folder):
         self.generate_children(folder)
@@ -438,13 +472,40 @@ class TreeController:
         print "No handled yet really, why fetch metadata of a file?"
         print "Updated when parent folder refresed"
 
-    def get_folder_for_path(self, search_folder, path):
-        for item in search_folder.get_items():
-            if not item.is_folder():
-                continue
-            if item.path == path:
-                return item
-            found = self.get_folder_for_path(item, path)
+    def get_folder_for_path(self, path, search_folder = None):
+        # Return root
+        if path == "/" or path == "":
+            return self.root_folder
+        # If start folder was not defined, start from root
+        if search_folder == None:
+            search_folder = self.root_folder
+        # Iterate folders untill we find path
+        for folder_item in search_folder.get_folders():
+            if folder_item.path == path:
+                return folder_item
+            found = self.get_folder_for_path(path, folder_item)
+            if found != None:
+                return found
+        return None
+
+    def get_item_for_path(self, path):
+        found = self.get_folder_for_path(path)
+        if found != None:
+            return found
+        found = self.get_file_for_path(path)
+        return found
+
+    def get_file_for_path(self, path, search_folder = None):
+        # If start folder was not defined, start from root
+        if search_folder == None:
+            search_folder = self.root_folder
+        # Iterate files untill we find path
+        for file_item in search_folder.get_files():
+            if file_item.path == path:
+                return file_item
+        # Iterate sub folders as deep as needed to find path
+        for folder in search_folder.get_folders():
+            found = self.get_file_for_path(path, folder)
             if found != None:
                 return found
         return None
@@ -469,7 +530,7 @@ class TreeController:
 
     def generate_children(self, parent):
         # Clean parent of previous items
-        self.clear_tree_item(parent.tree_item)
+        self.clear_tree_item(parent)
         for item in parent.get_items():
             # Read item params
             columns = QStringList()
@@ -490,6 +551,9 @@ class TreeController:
 
         # sort alphapetically and add items to tree
         self.sort_and_show_children(parent)
+
+        # add loading widgets
+        self.add_loading_widgets(parent.get_items())
 
     def sort_and_show_children(self, parent):
         folders = {}
@@ -514,8 +578,34 @@ class TreeController:
         for file_name in sorted_files:
             sorted_file_tree_items.append(files[file_name].tree_item)
         parent.tree_item.addChildren(sorted_file_tree_items)
+
+    def add_loading_widgets(self, children):
+        # Generate list if only one item was given
+        if not type(children) is list:
+            item_list = []
+            item_list.append(children)
+            children = item_list
+        # Add loading widgets to tree items
+        for child in children:
+            if child.tree_item == None:
+                return
+            # Create loading widget
+            load_widget = QtGui.QLabel()
+            load_widget.resize(30,30)
+
+            # Create animation
+            load_anim = QMovie("ui/images/loading_tree.gif", "GIF", load_widget)
+            load_anim.setCacheMode(QMovie.CacheAll)
+            load_anim.setSpeed(150)
+            load_anim.setScaledSize(QtCore.QSize(30,30))
+            load_widget.setMovie(load_anim)
+
+            # Add to data model and tree
+            child.set_load_widget(load_widget, load_anim)
+            self.tree.setItemWidget(child.tree_item, 1, load_widget)
             
-    def clear_tree_item(self, item):
+    def clear_tree_item(self, data):
+        item = data.tree_item
         for child in item.takeChildren():
             item.removeChild(child)
             del child
@@ -648,5 +738,24 @@ class TreeController:
         data = self.get_data_for_item(item)
         if not data.is_folder():
             return
+        self.start_load_anim(data)
         self.connection.get_metadata(data.path, data.root, data.hash)
         
+    def start_load_anim(self, item):
+        item.set_loading(True)
+        self.load_animations.append(item)
+
+    def stop_load_anim(self, item):
+        item.set_loading(False)
+        try:
+            self.load_animations.remove(item)
+        except ValueError:
+            return
+
+    def stop_all_load_anims(self):
+        for item in self.load_animations:
+            item.set_loading(False)
+        self.load_animations = []
+
+    def clear_all_load_animations(self):
+        self.load_animations = []        

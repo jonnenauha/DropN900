@@ -1,6 +1,7 @@
 
 from PyQt4.QtGui import QIcon, QPixmap, QImage
 
+import pprint
 """ DataParser gets data from network layer, converts
     to app format and sends onwards to ui layer """
 
@@ -9,20 +10,28 @@ class DataParser:
     def __init__(self, ui_handler):
         self.ui_handler = ui_handler
         self.tree_controller = ui_handler.tree_controller
+        self.controller = ui_handler.controller
         self.log = self.ui_handler.controller.log
 
-    def parse_metadata(self, data):
-        if data == None:
-            return
+        self.pp = pprint.PrettyPrinter(indent=2)
 
+    def parse_metadata(self, data, opened_folders):
+        tree_item = None
+        if data == None:
+            return tree_item
+
+        #print ""
+        #self.pp.pprint(data)
+        #print ""
+     
         if data["is_dir"]:
             parent_root = data["root"]
             # Find existing folder, or create root
             if data["path"] != "":
-                folder = self.tree_controller.get_folder_for_path(self.tree_controller.root_folder, data["path"])
+                folder = self.tree_controller.get_folder_for_path(data["path"])
                 if folder == None:
                     self.log("ERROR - Something went very wrong, did not find folder in parse_metada()!")
-                    return;
+                    return tree_item
                 folder.clear_items()
                 folder.hash = data["hash"]
                 self.check_deleted(data, folder, folder.tree_item)
@@ -48,9 +57,17 @@ class DataParser:
                 self.tree_controller.set_root_folder(folder)
             else:
                 self.tree_controller.update_folder(folder.path, folder)
-        else:
-            # Does not happen, we dont update item metadatas when double clicked, why should we?
-            return
+
+            tree_item = folder
+
+##            # Expand previously opened folders
+##            if opened_folders != None:
+##                for child_folder in folder.get_folders():
+##                    if opened_folders.has_key(child_folder.get_name()):
+##                        if child_folder.path == opened_folders[child_folder.get_name()]:
+##                            self.controller.connection.get_metadata(child_folder.path, child_folder.root)
+
+        return tree_item
 
     def check_deleted(self, data, item, tree_item = None):
         # This is a bit retarded looking... meh
@@ -97,40 +114,87 @@ class DataParser:
             self.ui_handler.manager_ui.label_username_icon.setPixmap(user_icon.scaled(24,24))
             self.log("Failed to fetch account data, treating as unknown user")
 
-        
-""" Collection aka folder data class """
+""" Parent class for all data items """
 
-class Collection:
+class Item:
 
-    def __init__(self, path, modified, icon, has_thumb, root, hashcode = None):
+    def __init__(self, path, root, modified, icon, has_thumb):
         self.path = path
-        self.hash = hashcode
         self.root = root
-        self.items = []
         self.modified = modified.split(" +")[0]
         self.icon = icon
         self.has_thumb = has_thumb
-        self.mime_type = "folder"
-
-        self.set_name(path)
-        self.format_parent()
         
         self.tree_item = None
+        self.load_widget = None
+        self.load_animation = None
+        self.public_link = None
+        self.hash = None
+        self.size = None
+
+        self.format_parent()
+
+    def get_name(self):
+        return self.name
+
+    def get_size(self):
+        if self.size == None:
+            return ""
+        else:
+            return self.size
+
+    def get_modified(self):
+        return self.modified
+    
+    def set_load_widget(self, widget, animation):
+        self.load_widget = widget
+        self.load_animation = animation
+
+    def set_loading(self, loading):
+        try:
+            if loading:
+                self.load_widget.setMovie(self.load_animation)
+                self.load_animation.start()
+            else:
+                self.load_animation.stop()
+                self.load_widget.setMovie(None)
+            self.load_widget.setVisible(loading)
+        except RuntimeError:
+            print "Could not stop C++ object for " + self.path + " deleted!"
+
+    def format_parent(self):
+        self.parent = "/"
+        for string in self.path.split("/")[0:-1]:
+            self.parent += string
+
+    def refresh_name_data(self, path):
+        self.path = path
+        self.set_name()
         
-    def set_name(self, path):
-        if path != "":
-            self.name = path.split("/")[-1]
+""" Collection aka folder data class """
+
+class Collection(Item):
+
+    def __init__(self, path, modified, icon, has_thumb, root, hashcode = None):
+        # Init parent class
+        Item.__init__(self, path, root, modified, icon, has_thumb)
+
+        # Init Collection params
+        self.hash = hashcode
+        self.items = []
+        self.mime_type = "folder"
+        
+        self.set_name()
+
+    def set_name(self):
+        if self.path != "":
+            self.name = self.path.split("/")[-1]
         else:
             if self.root == "sandbox":
                 self.name = "DropN900"
             else:
                 self.name = "DropBox"
 
-    def format_parent(self):
-        self.parent = "/"
-        for string in self.path.split("/")[0:-1]:
-            self.parent += string
-            
     def add_item(self, item):
         self.items.append(item)
 
@@ -143,14 +207,19 @@ class Collection:
     def get_items(self):
         return self.items
 
-    def get_name(self):
-        return self.name
-    
-    def get_size(self):
-        return ""
+    def get_folders(self):
+        folders = []
+        for child in self.items:
+            if child.is_folder():
+                folders.append(child)
+        return folders
 
-    def get_modified(self):
-        return self.modified
+    def get_files(self):
+        files = []
+        for child in self.items:
+            if not child.is_folder():
+                files.append(child)
+        return files
 
     def is_folder(self):
         return True
@@ -169,25 +238,22 @@ class Collection:
 
 """ Resource aka file data class """
 
-class Resource:
+class Resource(Item):
 
     def __init__(self, path, size, modified, mime_type, icon, has_thumb, root):
-        self.name = path.split("/")[-1]
-        self.path = path
+        # Init parent class
+        Item.__init__(self, path, root, modified, icon, has_thumb)
+
+        # Init Resource params
         self.size = size
-        self.modified = modified
         self.mime_type = mime_type
-        self.icon = icon
-        self.has_thumb = has_thumb
-        self.root = root
-
+        
+        self.set_name()
         self.format_size()
-        self.format_modified()
-        self.format_parent()
 
-        self.tree_item = None
-        self.public_link = None
-
+    def set_name(self):
+        self.name = self.path.split("/")[-1]
+        
     def format_size(self):
         i = self.size.find("MB")
         if i != -1:
@@ -195,23 +261,6 @@ class Resource:
         i = self.size.find("KB")
         if i != -1:
             self.size = self.size[0:i] + " KB"
-
-    def format_modified(self):
-        self.modified = self.modified.split(" +")[0]
-
-    def format_parent(self):
-        self.parent = "/"
-        for string in self.path.split("/")[0:-1]:
-            self.parent += string
-        
-    def get_name(self):
-        return self.name
-    
-    def get_size(self):
-        return self.size
-
-    def get_modified(self):
-        return self.modified
 
     def is_folder(self):
         return False
