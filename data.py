@@ -1,16 +1,23 @@
 
-from PyQt4.QtGui import QIcon, QPixmap, QImage
+from __future__ import division
+import os
+
+from PyQt4.QtGui import QIcon, QPixmap, QImage, QApplication
+from PyQt4.QtCore import QDir, QString
+
+from ConfigParser import ConfigParser, SafeConfigParser, NoSectionError
 
 """ DataParser gets data from network layer, converts
     to app format and sends onwards to ui layer """
 
 class DataParser:
 
-    def __init__(self, ui_handler):
+    def __init__(self, ui_handler, logger):
         self.ui_handler = ui_handler
         self.tree_controller = ui_handler.tree_controller
         self.controller = ui_handler.controller
-        self.log = self.ui_handler.controller.log
+        self.logger = logger
+        self.uid = None
 
     def parse_metadata(self, data, opened_folders):
         tree_item = None
@@ -23,7 +30,7 @@ class DataParser:
             if data["path"] != "":
                 folder = self.tree_controller.get_folder_for_path(data["path"])
                 if folder == None:
-                    self.log("ERROR - Something went very wrong, did not find folder in parse_metada()!")
+                    self.logger.error("Something went very wrong, did not find folder in parse_metada()!")
                     return tree_item
                 folder.clear_items()
                 folder.hash = data["hash"]
@@ -42,6 +49,8 @@ class DataParser:
                     child = Collection(path, modified, icon, has_thumb, parent_root)
                 else:
                     child = Resource(path, size, modified, item["mime_type"], icon, has_thumb, parent_root)
+                    if path.startswith("/Public/"):
+                        child.generate_public_link(self.uid)
                 folder.add_item(child)
                 self.check_deleted(item, child)
 
@@ -69,13 +78,13 @@ class DataParser:
                 if data["is_dir"]:
                     if item.tree_item != None:
                         item.tree_item.setExpanded(False)
-                        item.tree_item.setIcon(0, QIcon("ui/icons/folder_delete.png"))
+                        item.tree_item.setIcon(0, QIcon(self.controller.datahandler.datapath("ui/icons/folder_delete.png")))
                         item.tree_item.setText(1, "deleted")
                     else:
                         item.mime_type = "deleted_folder"
                 else:
                     if item.tree_item != None:
-                        item.tree_item.setIcon(0, QIcon("ui/icons/cancel.png"))
+                        item.tree_item.setIcon(0, QIcon(self.controller.datahandler.datapath("ui/icons/cancel.png")))
                         item.tree_item.setText(1, "deleted")
                     else:
                         item.mime_type = "deleted_item"
@@ -86,7 +95,7 @@ class DataParser:
     def parse_thumbnail(self, resp, image_path):
         image = QImage.fromData(resp.read())
         if image.isNull():
-            self.log("ERROR - Failed to generate image from raw data for", image_path)
+            self.logger.warning("Failed to generate image from raw data for", image_path)
             self.tree_controller.thumbs[image_path] = None # So we dont come here again
             return
         pixmap = QPixmap.fromImage(image)
@@ -96,16 +105,140 @@ class DataParser:
     def parse_account_info(self, resp):
         if resp.status == 200:
             account_data = resp.data
+            self.uid = str(account_data["uid"])
             name = account_data["display_name"]
             self.ui_handler.manager_ui.label_username.setText(name)
-            user_icon = QPixmap("ui/icons/user.png")
+            user_icon = QPixmap(self.controller.datahandler.datapath("ui/icons/user.png"))
             self.ui_handler.manager_ui.label_username_icon.setPixmap(user_icon.scaled(24,24))
-            self.log("Account data recieved")
+            self.logger.auth("Account data received for " + name)
         else:
             self.ui_handler.manager_ui.label_username.setText("unknown user")
-            user_icon = QPixmap("ui/icons/user_white.png")
+            user_icon = QPixmap(self.controller.datahandler.datapath("ui/icons/user_white.png"))
             self.ui_handler.manager_ui.label_username_icon.setPixmap(user_icon.scaled(24,24))
-            self.log("Failed to fetch account data, treating as unknown user")
+            self.logger.auth("Failed to fetch account data, treating as unknown user")
+
+
+""" Maemo data handler """
+
+class MaemoDataHandler:
+
+    def __init__(self, controller, maemo, logger):
+        self.controller = controller
+        self.maemo = maemo
+        self.logger = logger
+        self.store_auth_to_file = True
+        self.dont_show_dl_dialog = False
+        if self.maemo:
+            self.user_home = str(QDir.home().absolutePath())
+            self.app_root = "/opt/dropn900/"
+            self.config_root = self.user_home + "/.dropn900/"
+            self.data_root = self.user_home + "/MyDocs/DropN900/"
+            self.default_data_root = self.user_home + "/MyDocs/DropN900"
+        else:
+            self.app_root = ""
+            self.config_root = ""
+            self.data_root = ""
+            self.default_data_root = ""
+
+    def datapath(self, datafile):
+        return self.app_root + datafile
+        
+    def configpath(self, configfile):
+        return self.config_root + configfile
+        
+    def datadirpath(self, datafile):
+        return self.data_root + datafile
+    
+    def get_data_dir_path(self):
+        return self.data_root
+        
+    def startup_checks(self):
+        self.logger.info("Running Maemo startup checks...")
+        if QDir.home().absolutePath() != "/home/user":
+            self.logger.warning(">> home folder != /home/user")
+        self.check_for_data_folder()
+        self.check_for_config_folder()
+        
+    def check_for_data_folder(self):
+        if not self.maemo:
+            return
+        if self.data_root == (self.user_home + "/MyDocs/DropN900/"):
+            data_dir = QDir.home()
+            if data_dir.cd("MyDocs"):
+                if not data_dir.cd("DropN900"):
+                    if data_dir.mkdir("DropN900"):
+                        self.logger.info(">> Created default data dir " + str(data_dir.absolutePath() + "/DropN900"))
+                    else:
+                        self.logger.error(">> Could not create default data dir 'DropN900' to " + str(data_dir.absolutePath()))
+                else:
+                    self.logger.info(">> Default data dir: " + str(data_dir.absolutePath()))
+            else:
+                self.logger.error(">> ERROR - Could not find 'MyDocs' folder from " + str(data_dir.absolutePath()))
+        else:
+            non_default_data_dir = QDir(self.data_root)
+            if non_default_data_dir.exists():
+                self.logger.info(">> Default data dir: " + self.data_root)
+            else:
+                self.logger.warning(">> User set default data dir " + self.data_root + " does not exist, resetting to default")
+                self.data_root = self.user_home + "/MyDocs/DropN900/"
+                self.check_for_data_folder()
+
+    def check_for_config_folder(self):
+        if not self.maemo:
+            return
+        config_dir = QDir.home()
+        if not config_dir.cd(".dropn900"):
+            if config_dir.mkdir(".dropn900"):
+                self.logger.info(">> Created config dir '.dropn900' to " + str(config_dir.absolutePath()))
+            else:
+                self.logger.error(">> Could not create config dir '.dropn900' to " + str(config_dir.absolutePath()))
+
+    def store_auth(self, access_token):
+        if self.store_auth_to_file:
+            token_config = ConfigParser()
+            token_config.add_section("token")
+            token_config.set("token", "secret", access_token.secret)
+            token_config.set("token", "key", access_token.key)
+            try:
+                config_file = open(self.configpath("token.ini"), "w")
+                token_config.write(config_file)
+                config_file.close()
+                self.logger.auth("Stored received access token")
+            except IOError:
+                self.logger.config("I/O error while storing received access token, file " + self.configpath("token.ini"))
+        else:
+            self.logger.auth("Skipping access token storing due to user settings")
+        
+    def reset_auth(self):
+        try:
+            os.remove(self.configpath("token.ini"))
+            self.logger.auth("Authentication reseted")
+            self.controller.ui.show_banner("Authentication reseted")
+        except OSError:
+            self.controller.ui.show_banner("No stored access token, could not reset authentication")
+        
+    def copy_url_to_clipboard(self, url):
+        clipboard = QApplication.clipboard()
+        clipboard.setText(url)
+        self.controller.ui.show_banner("Copied " + url + " to clipboard", 3000)
+        
+    """ Code snipped taken from http://code.activestate.com/recipes/577081-humanized-representation-of-a-number-of-bytes/ """
+    def humanize_bytes(self, bytes, precision = 1):
+        abbrevs = (
+            (1<<50L, 'PB'),
+            (1<<40L, 'TB'),
+            (1<<30L, 'GB'),
+            (1<<20L, 'MB'),
+            (1<<10L, 'KB'),
+            (1, 'bytes')
+        )
+        if bytes == 1:
+            return '1 byte'
+        for factor, suffix in abbrevs:
+            if bytes >= factor:
+                break
+        return '%.*f %s' % (precision, bytes / factor, suffix)
+
 
 """ Parent class for all data items """
 
@@ -114,7 +247,7 @@ class Item:
     def __init__(self, path, root, modified, icon, has_thumb):
         self.path = path
         self.root = root
-        self.modified = modified.split(" +")[0]
+        self.format_modified(modified)
         self.icon = icon
         self.has_thumb = has_thumb
         
@@ -136,6 +269,48 @@ class Item:
         else:
             return self.size
 
+    """ This may seem a bit difficult of an approach, let me explain:
+        We get english names for months from dropbox, this will get us into localization problems
+        if the device has != english as language. We form same kind of timestamps that we get from maemo os module.
+        This way we can compare timestamps directly when syncing """
+    def format_modified(self, modified):
+        if modified == "":
+            self.modified = modified
+            return
+
+        months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        # Strinp timezone (always +0000) and name of day
+        modified = modified.split(" +")[0]
+        modified = modified[5:]
+        
+        # Split timestamp to elements
+        modified_split = modified.split(" ")
+        if len(modified_split) == 4:
+            # Get elements
+            day = modified_split[0]
+            month_string = modified_split[1]
+            year =  modified_split[2]
+            time = modified_split[3]
+        else:
+            print "#1 FATAL ERROR ON TIMESTAMP PARSING!"
+            self.modified = "<timestamp parse error, report to app author>"
+            return
+            
+        # Convert name of english month name to number
+        try:
+            month = months.index(month_string) + 1
+            if month < 10:
+                month = "0" + str(month)
+            else:
+                month = str(month)
+        except IndexError:
+            print "#2 FATAL ERROR ON TIMESTAMP PARSING!"
+            self.modified = "<timestamp parse error, report to app author>"
+            return
+            
+        # Form final timestamp
+        self.modified = day + "." + month + "." + year + " " + time
+        
     def get_modified(self):
         return self.modified
     
@@ -144,21 +319,24 @@ class Item:
         self.load_animation = animation
 
     def set_loading(self, loading):
+        if self.load_widget == None or self.load_animation == None:
+            return
         try:
+            self.load_widget.setVisible(loading)
             if loading:
                 self.load_widget.setMovie(self.load_animation)
                 self.load_animation.start()
             else:
                 self.load_animation.stop()
-                self.load_widget.setMovie(None)
-            self.load_widget.setVisible(loading)
+                self.load_widget.setMovie(None)        
         except RuntimeError:
             print "Could not stop C++ object for " + self.path + " deleted!"
 
     def format_parent(self):
-        self.parent = "/"
+        self.parent = ""
         for string in self.path.split("/")[0:-1]:
-            self.parent += string
+            self.parent += string + "/"
+        self.parent = self.parent[0:-1]
 
     def refresh_name_data(self, path):
         self.path = path
@@ -257,6 +435,13 @@ class Resource(Item):
 
     def is_folder(self):
         return False
+        
+    def generate_public_link(self, uid):
+        if uid != None:
+            public_path = self.path[len("/Public"):]
+            self.public_link = "http://dl.dropbox.com/u/" + uid + public_path
+        else:
+            self.public_link = None
     
     # For debug prints
     def __str__(self):
@@ -268,3 +453,4 @@ class Resource(Item):
         print "  Mime : ", self.mime_type
         print "  TREE item : ", self.tree_item
         return ""
+

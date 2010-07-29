@@ -1,9 +1,12 @@
 
 import os
 
+from httplib import socket 
 from threading import Thread
-from data import DataParser, Collection, Resource
+
 from PyQt4.QtCore import QObject, QTimer
+from data import DataParser, Collection, Resource
+from dbusmanager import DBusMonitor
 
 """ ConnectionManager gets request from ui layer. Does there request to network
     with python threads so it wont block the main ui thread. Returs data either to
@@ -11,13 +14,14 @@ from PyQt4.QtCore import QObject, QTimer
 
 class ConnectionManager:
 
-    def __init__(self, controller, ui_handler):
+    def __init__(self, controller, ui_handler, logger, maemo_env):
         self.controller = controller
-        self.data_parser = DataParser(ui_handler)
+        self.data_parser = DataParser(ui_handler, logger)
         self.ui_handler = ui_handler
         self.tree_controller = ui_handler.tree_controller
-        self.log = controller.log
+        self.logger = logger
         self.client = None
+        self.transfer_manager = None
 
         # Init poll timer
         self.poll_timer = QTimer()
@@ -25,30 +29,118 @@ class ConnectionManager:
 
         # Init running threads to empty
         self.running_threads = []
+        self.running_data_workers = []
+        self.queued_threads = []
+        
+        # DBus manager
+        self.dbus_monitor = DBusMonitor(self, logger, maemo_env)
+        
+        # Start the thread poller
+        self.poll_timer.start(200)
 
+    def set_transfer_manager(self, transfer_manager):
+        self.transfer_manager = transfer_manager
+    
     def thread_poller(self):
-        for thread in self.running_threads:
-            thread.join(0.01)
-            if not thread.isAlive():
-                if thread.callback_parameters != None:
-                    thread.callback(thread.response, thread.callback_parameters)
-                else:
-                    thread.callback(thread.response)
-                self.running_threads.remove(thread)
+        # Give gmainloop a iteration
+        self.dbus_monitor.iteration()
+        
+        # Check for completed network threads
+        if len(self.running_threads) > 0:
+            removable_network_threads = []
+            for thread in self.running_threads:
+                thread.join(0.01)
+                if not thread.isAlive():
+                    if thread.error != None:
+                        # If tree exists, lets store the request and do it again
+                        # when a connection is available
+                        if self.tree_controller.root_folder != None:
+                            self.queued_threads.append(thread)
+                        # Request a connection only once
+                        if len(self.queued_threads) == 1:
+                            self.request_connection()
+                    if thread.response != None:
+                        if thread.callback_parameters != None:
+                            thread.callback(thread.response, thread.callback_parameters)
+                        else:
+                            thread.callback(thread.response)
+                    removable_network_threads.append(thread)  
+            for removable in removable_network_threads:
+                self.running_threads.remove(removable)
+                del removable
 
+        # Check for completed data threads
+        if len(self.running_data_workers) > 0:
+            removable_data_threads = []
+            for data_thread in self.running_data_workers:
+                data_thread.join(0.01)
+                if not data_thread.isAlive():
+                    if data_thread.error != None:
+                        self.logger.error(data_thread.error)
+                    removable_data_threads.append(data_thread)
+            for removable in removable_data_threads:
+                self.running_data_workers.remove(removable)
+                del removable
+                    
+    def request_connection(self):
+        self.dbus_monitor.request_connection()
+        
+    def connection_available(self):
+        return self.dbus_monitor.device_has_networking
+        
+    def set_connected(self, connected):
+        if connected:
+            self.ui_handler.hide_loading_ui()
+            if self.controller.login_done == False:
+                self.controller.start_trusted_auth()
+                trusted_login_ui = self.ui_handler.trusted_login_ui
+                if trusted_login_ui.line_edit_email.text().isEmpty() == False and trusted_login_ui.line_edit_password.text().isEmpty() == False:
+                    self.logger.network("Network connection established, starting authentication")
+                    self.ui_handler.try_trusted_login()
+            elif self.controller.connected == True and self.client != None:
+                if len(self.queued_threads) > 0:
+                    self.ui_handler.show_information_ui("Connection established, fetching queued tasks", True)
+                    self.logger.network("Network connection established, starting queued networking")
+                    for queued_thread in self.queued_threads:
+                        worker = NetworkWorker()
+                        worker.clone(queued_thread)
+                        worker.start()
+                        self.running_threads.append(worker)
+                    self.queued_threads = []
+                else:
+                    self.ui_handler.show_information_ui("Connection established, fetching content", True)
+                    self.logger.network("Network connection established, fetching root metadata")
+                    self.get_account_data()
+                    self.get_metadata("/", "dropbox")
+        else:
+            self.ui_handler.show_loading_ui("Waiting for a connection...", True)
+    
     def set_client(self, client):
         # Set client for usage, we are not connected
         self.client = client
+        self.transfer_manager.set_client(client)
         # Get account information
-        self.data_parser.parse_account_info(self.client.account_info())
-        # Start network thread poller
-        self.poll_timer.start(100)
-        # Start by fetching sandbox root contents
-        self.get_metadata("/", "sandbox")
-        
+        if self.connection_available():
+            if self.get_account_data():
+                # Start by fetching sandbox root contents
+                self.get_metadata("/", "dropbox")
+            else:
+                self.ui_handler.show_loading_ui("Waiting for a connection...", True)
+                self.request_connection()
+        else:
+            self.ui_handler.show_loading_ui("Waiting for a connection...", True)
+            self.request_connection()
+
+    def get_account_data(self):
+        try:
+            self.data_parser.parse_account_info(self.client.account_info())
+            return True
+        except (socket.error, socket.gaierror), err:
+            return False
+    
     def check_client(self):
         if not self.client:
-            self.log("ERROR - Tried networking without a ready connection")
+            self.logger.network_error("Tried networking without a ready connection")
             return False
         else:
             return True
@@ -59,8 +151,8 @@ class ConnectionManager:
     def hide_loading_ui(self):
         self.ui_handler.hide_loading_ui()
 
-    def show_information(self, message, succesfull):
-        self.ui_handler.show_information_ui(message, succesfull)
+    def show_information(self, message, succesfull, timeout = 4000):
+        self.ui_handler.show_information_ui(message, succesfull, timeout)
 
     def get_automated_metadata(self, folder_path, root):
         folder = self.tree_controller.get_folder_for_path(folder_path)
@@ -96,8 +188,8 @@ class ConnectionManager:
                 if resp.status == 200: # ok
                     tree_item = self.data_parser.parse_metadata(resp.data, self.updated_open_folders)
                 else:
-                    self.log("NETWORK ERROR "+str(resp.status)+" - Could not fetch metadata")
-                    self.log(">> ", resp.body)
+                    self.logger.network_error(str(resp.status) + " - Could not fetch metadata")
+                    self.logger.network_error(">> ", resp.body)
                     self.show_information("Metadata fetch failed, network error", False)
         else:
             self.show_information("Metadata fetch failed, internal error", False)
@@ -118,7 +210,7 @@ class ConnectionManager:
                 if child_folder.tree_item.isExpanded():
                     self.updated_open_folders[child_folder.get_name()] = child_folder.path
         else:
-            self.log("ERROR - Could not find tree item for path", path)
+            self.logger.error("Could not find tree item for path", path)
 
     ### GET THUMBNAIL HANDLERS
     def get_thumbnail(self, path, root, size):
@@ -145,95 +237,77 @@ class ConnectionManager:
             if resp.status == 200:
                 self.data_parser.parse_thumbnail(resp, image_path)
             else:
-                self.log("NETWORK ERROR "+str(resp.status)+" - Could not fetch thumbnail for", image_path)
-                self.log(">> Reason:", resp.read())
+                self.logger.network_error(str(resp.status) + " - Could not fetch thumbnail for", image_path)
+                self.logger.network_error(">> Reason:", resp.read())
                 self.show_information("Thumbnail fetch failed, network error", False)
         else:
             self.hide_loading_ui()
             self.show_information("Thumbnail fetch failed, internal error", False)
 
     ### GET FILE HANDLERS
-    def get_file(self, path, root, store_path):
+    def get_file(self, path, root, store_path, size, sync_download = False):
+        if not self.check_client:
+            return
         file_name = path.split("/")[-1]
-        self.show_loading_ui("Downloading file " + file_name)
-        
-        # Make thread
-        worker = NetworkWorker()
-        worker.set_callable(self.client.get_file, root, path)
-        worker.set_callback(self.get_file_callback, store_path, file_name)
-        worker.start()
-
-        # Add thread to watch list
-        self.running_threads.append(worker)
+        dropbox_path = path[0:path.rfind("/")]
+        if sync_download == False:
+            self.show_information("Download queued\n" + file_name, None, 4000)
+        self.transfer_manager.handle_download(path, root, file_name, dropbox_path, store_path, size, sync_download)
         
     def get_file_callback(self, resp, params):
         if resp != None and params[0] != None and params[1] != None:
             store_path = params[0]
             file_name = params[1]
-            self.hide_loading_ui()
             if resp.status == 200:
-                try:
-                    f = open(store_path, "wb")
-                    f.write(resp.read())
-                    f.close()
-                    self.show_information("Download of " + file_name + " completed", True)
-                except IOError:
-                    self.show_information("Could not open " + store_path + " for store operation", False)
+                store_worker = DataWorker("store")
+                store_worker.setup_store(store_path, resp)
+                store_worker.start()
+                self.running_data_workers.append(store_worker)
             else:
-                self.log("NETWORK ERROR "+str(resp.status)+" - Could not download file to", store_path)
-                self.log(">> Reason:", resp.read())
-                self.show_information("Download failed, network error", False)
+                self.logger.network_error(str(resp.status) + " - Could not download file to", store_path)
+                self.logger.network_error(">> Reason:", resp.read())
         else:
-            self.hide_loading_ui()
-            self.show_information("Download failed, internal error", False)
+            self.logger.error("Download failed, internal error")
 
     ### UPLOAD FILE HANDLERS
     def upload_file(self, path, root, local_file_path):
-        # Get info for ui and show loading ui
+        if not self.check_client:
+            return
+ 
+        # Get info for ui
         if root == "sandbox":
             root_name = "DropN900"
         elif root == "dropbox":
             root_name = "DropBox"
         else:
-            self.log("ERROR - Upload file path/root parse error! Cannot continue.")
+            self.logger.error("Upload file path/root parse error! Cannot continue.")
             return
         file_name = local_file_path.split("/")[-1]
-        self.show_loading_ui("Uploading file " + file_name + "\nto " + root_name + path)
+        folder_path = local_file_path[0:local_file_path.rfind("/")]
 
         # Open file for lib
         try:
             file_obj = open(local_file_path, "rb")
         except IOError:
-            self.hide_loading_ui()
-            self.log("ERROR - Could not open " + local_file_path + " file for uploading. Aborting")
+            self.logger.error("Could not open " + local_file_path + " file. Aborting upload.")
             self.show_information("Could not open " + local_file_path + " file for uploading", False)
             return
         
-        # Make thread
-        worker = NetworkWorker()
-        worker.set_callable(self.client.put_file, root, path, file_obj)
-        worker.set_callback(self.upload_file_callback, root, path, file_name)
-        worker.start()
-
-        # Add thread to watch list
-        self.running_threads.append(worker)
+        self.show_information("Upload queued\n" + file_name, None, 4000)
+        self.transfer_manager.handle_upload(path, root, file_obj, file_name, folder_path, root_name + path, local_file_path)
 
     def upload_file_callback(self, resp, params):
         if resp != None and params[0] != None and params[1] != None and params[2] != None:
             root = params[0]
             store_path = params[1]
             file_name = params[2]
-            self.hide_loading_ui()
             if resp.status == 200:
                 self.get_automated_metadata(store_path, root)
-                self.show_information("Upload of " + file_name + " completed", True)
             else:
-                self.log("NETWORK ERROR "+str(resp.status)+" - Upload of " + params[0] + " to " + store_path + "failed.")
-                self.log(">> Reason:", resp.body)
-                self.show_information("Upload of " + file_name + " failed, network error", False)
+                self.logger.network_error(str(resp.status) + " - Upload of " + params[0] + " to " + store_path + "failed.")
+                self.logger.network_error(">> Reason:", resp.body)
         else:
-            self.hide_loading_ui()
-            self.show_information("Upload failed, internal error", False)
+            self.logger.error("Upload failed, internal error")
 
     ### RENAME HANDLERS
     def rename(self, root, from_path, to_path, data):
@@ -264,8 +338,8 @@ class ConnectionManager:
                 data.tree_item.setText(0, new_name)
                 self.show_information("Renamed " + old_name + " succesfully", True)
             else:
-                self.log("NETWORK ERROR "+str(resp.status)+" - Renaming failed.")
-                self.log(">> Reason:", resp.body)
+                self.logger.network_error(str(resp.status) + " - Renaming failed.")
+                self.logger.network_error(">> Reason:", resp.body)
                 self.show_information("Renaming of " + old_name + " failed, network error", False)
             # Stop rename loading anim
             data.set_loading(False)
@@ -300,8 +374,8 @@ class ConnectionManager:
                 self.get_automated_metadata(update_path, root)
                 self.show_information("Removed " + keyword + removed_file + " succesfully", True)
             else:
-                self.log("NETWORK ERROR "+str(resp.status)+" - Removing " + keyword + removed_file + " from " + update_path + " failed.")
-                self.log(">> Reason:", resp.body)
+                self.logger.network_error(str(resp.status) + " - Removing " + keyword + removed_file + " from " + update_path + " failed.")
+                self.logger.network_error(">> Reason:", resp.body)
                 self.show_information("Removing of " + keyword + removed_file + " failed, network error", False)
         else:
             self.hide_loading_ui()
@@ -339,13 +413,13 @@ class ConnectionManager:
                 self.get_automated_metadata(update_path, root)
                 self.show_information("Created folder " + folder_name + " succesfully", True)
             else:
-                self.log("NETWORK ERROR "+str(resp.status)+" - Could not create folder " + full_create_path)
-                self.log(">> Reason:", resp.body)
+                self.logger.network_error(str(resp.status) + " - Could not create folder " + full_create_path)
+                self.logger.network_error(">> Reason:", resp.body)
                 self.show_information("Creating folder " + folder_name + " failed, network error", False)
         else:
             self.hide_loading_ui()
             self.show_information("Creating folder failed, internal error", False)
-        
+
 
 """ NetworkWorker is a simple thread subclass that will do networking.
     Set method with arguments. Set callback function that will be called with self.response
@@ -355,13 +429,19 @@ class NetworkWorker(Thread):
 
     def __init__(self):
         Thread.__init__(self)
-        
         self.method = None
         self.parameters = None
         self.callback = None
         self.callback_parameters = None
         self.response = None
-
+        self.error = None
+        
+    def clone(self, worker):
+        self.method = worker.method
+        self.parameters = worker.parameters
+        self.callback = worker.callback
+        self.callback_parameters = worker.callback_parameters
+                        
     def set_callable(self, method, *parameters):
         self.method = method
         self.parameters = parameters
@@ -374,4 +454,35 @@ class NetworkWorker(Thread):
             self.callback_parameters= None
 
     def run(self):
-        self.response = self.method(*self.parameters)
+        try:
+            self.response = self.method(*self.parameters)
+        except (socket.error, socket.gaierror), err:
+            self.response = None
+            self.error = err
+
+""" DataWorker is a simple thread subclass that does file writing, this way the main thread can run at peace """
+
+class DataWorker(Thread):
+
+    def __init__(self, action):
+        Thread.__init__(self)
+        self.action = action
+        self.file_path = None
+        self.data = None
+        self.error = None
+        
+    def setup_store(self, file_path, data):
+        self.file_path = file_path
+        self.data = data
+        
+    def run(self):
+        if self.action == "store":
+            try:
+                f = open(self.file_path, "wb")
+                f.write(self.data.read())
+                f.close()
+            except IOError:
+                self.error = "Could not open " + self.file_path + " for file I/O"
+                
+                    
+        

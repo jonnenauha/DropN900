@@ -1,9 +1,9 @@
 
-import time
 import os
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt, QStringList, QTimer
+from PyQt4 import QtCore, QtGui, QtMaemo5
+from PyQt4.QtMaemo5 import QMaemo5InformationBox
+from PyQt4.QtCore import Qt, QString, QStringList, QTimer, QDir
 from PyQt4.QtGui import QMainWindow, QWidget, QTreeWidgetItem, QDesktopServices
 from PyQt4.QtGui import QImage, QPixmap, QIcon, QImageReader, QMovie
 from PyQt4.QtGui import QInputDialog, QFileDialog, QMessageBox
@@ -11,21 +11,26 @@ from PyQt4.QtNetwork import QNetworkReply, QNetworkRequest
 
 from ui.ui_mainwindow import Ui_DropN900Widget
 from ui.ui_loginwidget import Ui_LoginWidget
+from ui.ui_trustedloginwidget import Ui_TrustedLoginWidget
 from ui.ui_browserwidget import Ui_BrowserWidget
 from ui.ui_managerwidget import Ui_ManagerWidget
 from ui.ui_consolewidget import Ui_ConsoleWidget
 from ui.ui_loadingwidget import Ui_LoadingWidget
 
+
 """ UiController controls ui view switching and ui interactions """
 
 class UiController:
 
-    def __init__(self, controller, debug_mode = False):
+    def __init__(self, controller, debug_mode, logger):
         self.controller = controller
+        self.datahandler = controller.datahandler
         self.debug_mode = debug_mode
+        self.logger = logger
 
         ### Main Window
         self.main_widget = QMainWindow()
+        self.main_widget.setAttribute(Qt.WA_Maemo5StackedWindow)
         self.main_ui = Ui_DropN900Widget()
         self.main_ui.setupUi(self.main_widget)
 
@@ -34,19 +39,28 @@ class UiController:
         self.main_ui.centralwidget.setLayout(self.stacked_layout)
 
         # Menu items
-        self.action_console = QtGui.QAction("Show Console", self.main_widget)
-        action_reset_auth = QtGui.QAction("Reset Auth", self.main_widget)
-        action_exit = QtGui.QAction("Exit", self.main_widget)
+        self.action_transfers = QtGui.QAction("Transfers", self.main_widget)
+        self.action_settings = QtGui.QAction("Settings", self.main_widget)
+        self.action_sync = QtGui.QAction("Synchronize", self.main_widget)
+        self.action_console = QtGui.QAction("Show Log", self.main_widget)
+        self.action_about = QtGui.QAction("About", self.main_widget)
+        self.action_exit = QtGui.QAction("Exit", self.main_widget)
 
+        self.main_ui.menubar.addAction(self.action_transfers)
+        self.main_ui.menubar.addAction(self.action_settings)
+        self.main_ui.menubar.addAction(self.action_sync)
         self.main_ui.menubar.addAction(self.action_console)
-        self.main_ui.menubar.addAction(action_reset_auth)
-        self.main_ui.menubar.addAction(action_exit)
+        self.main_ui.menubar.addAction(self.action_about)
+        self.main_ui.menubar.addAction(self.action_exit)
 
         # Connects
+        self.action_transfers.triggered.connect(self.show_transfer_widget)
+        self.action_sync.triggered.connect(self.synchronize_now)
+        self.action_settings.triggered.connect(self.show_settings_widget)
         self.action_console.triggered.connect(self.show_console)
-        action_reset_auth.triggered.connect(self.controller.reset_auth)
-        action_exit.triggered.connect(self.shut_down)
-        
+        self.action_about.triggered.connect(self.show_about)
+        self.action_exit.triggered.connect(self.shut_down)
+
         ### Browser Widget
         self.browser_widget = QWidget()
         self.browser_ui = Ui_BrowserWidget()
@@ -61,7 +75,7 @@ class UiController:
         
         network_manager = self.browser_ui.webview.page().networkAccessManager()
         network_manager.sslErrors.connect(self.ssl_errors_occurred)
-        network_manager.finished.connect(self.load_reply_recieved)
+        network_manager.finished.connect(self.load_reply_received)
 
         ### Login Widget
         self.login_widget = QWidget()
@@ -72,6 +86,15 @@ class UiController:
         # Connects
         self.login_ui.button_action.clicked.connect(self.login_button_clicked)
         
+        ### Trusted Login Widget
+        self.trusted_login_widget = QWidget()
+        self.trusted_login_ui = Ui_TrustedLoginWidget()
+        self.trusted_login_ui.setupUi(self.trusted_login_widget)
+        self.trusted_login_ui.label_icon.setPixmap(QPixmap(self.datahandler.datapath("ui/images/dropn900_logo.png")).scaled(65,65))
+
+        # Connects
+        self.trusted_login_ui.button_auth.clicked.connect(self.try_trusted_login)
+        
         ### Manager Widget
         self.manager_widget = QWidget()
         self.manager_ui = Ui_ManagerWidget()
@@ -79,32 +102,41 @@ class UiController:
         
         # Tree Controller
         tree = self.manager_ui.tree_widget
-        self.tree_controller = TreeController(tree, self.manager_ui, self.controller.log)
+        self.tree_controller = TreeController(tree, self.manager_ui, self.controller, self.logger)
 
-        # Hide public link elements (not used yet)
-        self.manager_ui.public_link_line_edit.hide()
+        # Hide public link elements on start
+        self.manager_ui.button_copy_public_link.hide()
         self.manager_ui.button_open_public_link.hide()
         
         # Connects
+        self.manager_ui.button_copy_public_link.clicked.connect(self.copy_item_link)
         self.manager_ui.button_open_public_link.clicked.connect(self.open_item_link)
         self.manager_ui.button_download.clicked.connect(self.item_download)
         self.manager_ui.button_upload.clicked.connect(self.item_upload)
         self.manager_ui.button_rename.clicked.connect(self.item_rename)
         self.manager_ui.button_remove.clicked.connect(self.item_remove)
         self.manager_ui.button_new_folder.clicked.connect(self.item_new_folder)
+        self.last_dl_location = None
+        self.last_ul_location = None
+
+        ### Console widget
+        
+        self.console_widget = QWidget(self.main_widget, Qt.Window)
+        self.console_widget.setAttribute(Qt.WA_Maemo5StackedWindow)
+        self.console_ui = Ui_ConsoleWidget()
+        self.console_ui.setupUi(self.console_widget)
+        self.console_ui.button_save.clicked.connect(self.save_log_to_file)
+        self.console_ui.button_back.clicked.connect(self.hide_console)
+        
+        ### Settings widget
+        self.settings_widget = None
 
         ### Fill stacked layout
         self.stacked_layout.addWidget(self.browser_widget)
         self.stacked_layout.addWidget(self.login_widget)
+        self.stacked_layout.addWidget(self.trusted_login_widget)
         self.stacked_layout.addWidget(self.manager_widget)
-
-        ### Console widget
-        if self.debug_mode:
-            self.console_widget = QWidget()
-            self.console_ui = Ui_ConsoleWidget()
-            self.console_ui.setupUi(self.console_widget)
-            self.console_ui.button_back.clicked.connect(self.hide_console)
-            self.stacked_layout.addWidget(self.console_widget)
+        self.stacked_layout.setCurrentWidget(self.trusted_login_widget)
 
         ### Loading Widget
         self.loading_widget = QWidget(self.manager_widget)
@@ -112,9 +144,11 @@ class UiController:
         self.loading_ui.setupUi(self.loading_widget)
         self.manager_ui.action_layout.insertWidget(3, self.loading_widget)
         self.loading_widget.hide()
+        
+        self.tree_controller.set_loading_ui(self.loading_ui)
 
         # Init loading animation
-        self.loading_animation = QMovie("ui/images/loading.gif", "GIF", self.loading_ui.load_animation_label)
+        self.loading_animation = QMovie(self.datahandler.datapath("ui/images/loading.gif"), "GIF", self.loading_ui.load_animation_label)
         self.loading_animation.setCacheMode(QMovie.CacheAll)
         self.loading_animation.setSpeed(150)
         self.loading_animation.setScaledSize(QtCore.QSize(48,48))
@@ -124,16 +158,46 @@ class UiController:
         self.information_message_timer = QTimer()
         self.information_message_timer.setSingleShot(True)
         self.information_message_timer.timeout.connect(self.hide_information_message)
-        self.information_icon_ok = QPixmap("ui/icons/check.png").scaled(24,24)
-        self.information_icon_error = QPixmap("ui/icons/cancel.png").scaled(24,24)
+        self.information_icon_ok = QPixmap(self.datahandler.datapath("ui/icons/check.png")).scaled(24,24)
+        self.information_icon_error = QPixmap(self.datahandler.datapath("ui/icons/cancel.png")).scaled(24,24)
+        self.information_icon_queue = QPixmap(self.datahandler.datapath("ui/icons/queue.png")).scaled(24,24)
 
-        self.log("UI initialised...")
-
+    def set_settings_widget(self, settings_widget):
+        self.settings_widget = settings_widget
+        
+    def set_transfer_widget(self, transfer_widget):
+        self.transfer_widget = transfer_widget
+        
+    def synchronize_now(self):
+        self.settings_widget.sync_now_clicked()
+        
     def show(self):
         # Nokia N900 screen resolution, full screen
         self.main_widget.resize(800, 480) 
         self.main_widget.show()
+        self.main_widget.showMaximized()
 
+    def show_settings_widget(self):
+        if self.settings_widget != None:
+            if not self.settings_widget.isVisible():
+                self.settings_widget.show()
+                self.settings_widget.check_settings()
+
+    def show_transfer_widget(self):
+        if self.settings_widget.isVisible():
+            self.settings_widget.hide()
+        self.transfer_widget.show()
+        
+    def show_about(self):
+        message = "<span style=\"color:white;\"><span style=\"color:#0099FF;\"><b>Maintainer</b></span> Jonne Nauha - jonne.nauha@evocativi.com<br><span style=\"color:#0099FF;\"><b>Bug Tracker</b></span> http://github.com/jonnenauha/DropN900/issues<br><span style=\"color:#0099FF;\"><b>Icons</b></span> http://openiconlibrary.sourceforge.net</span></span>"
+        QMaemo5InformationBox.information(self.manager_widget, QString(message), 0)
+        
+    def show_note(self, message):
+        QMaemo5InformationBox.information(None, QString(message), 0)
+        
+    def show_banner(self, message, timeout = 5000):
+        QMaemo5InformationBox.information(None, QString(message), timeout)
+        
     def show_loading_ui(self, message = "", loading = True):
         self.loading_ui.info_label.setText(message)
         self.loading_ui.info_label_icon.hide()
@@ -147,20 +211,22 @@ class UiController:
         else:
             self.loading_animation.stop()
 
-    def show_information_ui(self, message, succesfull):
+    def show_information_ui(self, message, succesfull, timeout = 4000):
         self.loading_ui.load_animation_label.hide()
-        if self.manager_ui.thumb_container.isVisible():
-            self.thumb_was_visible = True
+        self.thumb_was_visible = self.manager_ui.thumb_container.isVisible()
+        if self.thumb_was_visible:
             self.manager_ui.thumb_container.hide()
         self.loading_ui.info_label.setText(message)
-        if succesfull:
+        if succesfull == None:
+            icon = self.information_icon_queue
+        elif succesfull:
             icon = self.information_icon_ok
         else:
             icon = self.information_icon_error
         self.loading_ui.info_label_icon.setPixmap(icon)
         self.loading_ui.info_label_icon.show()
         self.loading_widget.show()
-        self.information_message_timer.start(4000)
+        self.information_message_timer.start(timeout)
 
     def hide_loading_ui(self):
         if not self.information_message_timer.isActive():
@@ -185,6 +251,48 @@ class UiController:
                 self.login_ui.button_action.setText("I'm done authenticating, lets go!")
         else:
             self.controller.end_auth()
+            
+    def try_trusted_login(self):
+        self.trusted_login_ui.label_error.setText("")
+        email = self.trusted_login_ui.line_edit_email.text()
+        password = self.trusted_login_ui.line_edit_password.text()
+
+        error = None
+        if email.isEmpty():
+            error = "Email can't be empty!"
+        elif email.count("@") != 1:
+            error = "Invalid email, check your @ signs!"
+        elif email.contains(" "):
+            error = "Invalid email, can't have spaces!"
+        elif password.isEmpty():
+            error = "Password can't be empty!"
+            
+        if error == None:
+            self.show_banner("Authenticating...", 3000)
+            self.set_trusted_login_info("Authenticating, please wait...")
+            self.truested_email = str(email)
+            self.trusted_password = str(password)
+            QTimer.singleShot(100, self.do_trusted_login_networking)
+        else:
+            self.set_trusted_login_error(error)
+            
+    def set_trusted_login_error(self, error):
+        self.trusted_login_ui.label_error.setStyleSheet("color: #9d1414;")
+        self.trusted_login_ui.label_error.setText(error)
+        
+    def set_trusted_login_info(self, info):
+        self.trusted_login_ui.label_error.setStyleSheet("color: #149d2b;")
+        self.trusted_login_ui.label_error.setText(info)
+        
+    def do_trusted_login_networking(self):
+        self.controller.end_trusted_auth(self.truested_email, self.trusted_password)
+        self.truested_email = None
+        self.trusted_password = None
+        
+    def reset_trusted_login(self):
+        self.trusted_login_ui.line_edit_email.clear()
+        self.trusted_login_ui.line_edit_password.clear()
+        self.trusted_login_ui.label_error.clear()
 
     def switch_context(self, view = None):
         widget = None
@@ -192,22 +300,17 @@ class UiController:
             widget = self.browser_widget
         if view == "login":
             widget = self.login_widget
+        if view == "trustedlogin":
+            widget = self.trusted_login_widget
         if view == "manager":
             widget = self.manager_widget
         if view == "console":
-            widget = self.console_widget
+            self.console_widget.show()
         if view == None and self.last_view != None:
             widget = self.last_view
         if widget != None:
             self.last_view = self.stacked_layout.currentWidget()
             self.stacked_layout.setCurrentWidget(widget)
-    
-    def log(self, msg):
-        if self.debug_mode:
-            timestamp = "%s:%s:%s" % (time.localtime().tm_hour, time.localtime().tm_min, time.localtime().tm_sec)
-            stamp_mgs = "%s %s" % (timestamp, msg)
-            self.console_ui.text_area.appendPlainText(stamp_mgs)
-            print "%s [DropN900]: %s" % (timestamp, msg)
 
     def get_selected_data(self):
         return self.tree_controller.selected_data
@@ -215,29 +318,32 @@ class UiController:
     # Signal handlers
             
     def shut_down(self):
-        self.log("Shutting down...")
         self.main_widget.close()
 
     def show_console(self):
-        if not self.debug_mode:
-            return
-        if self.action_console.text() == "Show Console":
-            self.action_console.setText("Hide Console")
+        if self.console_widget.isVisible() == False:
             self.switch_context("console")
         else:
             self.hide_console()
-        
+
     def hide_console(self):
-        if not self.debug_mode:
-            return
-        self.action_console.setText("Show Console")
-        self.stacked_layout.setCurrentWidget(self.last_view)
+        self.console_widget.hide()
+                    
+    def save_log_to_file(self):
+        filename = self.datahandler.get_data_dir_path() + "dropn900.log"
+        log_string = str(self.console_ui.text_area.toPlainText())
+        try:
+            log_file = open(filename, "w")
+            log_file.write(log_string)
+            log_file.close()
+            self.show_banner("Log saved to " + filename)
+        except IOError:
+            self.logger.error("Could not open " + filename + " to save log")
 
     # We should not end here in the device as it has ssl libs in place
     # on windows youll have to have openssl libs in place or login via webauth wont work
     def ssl_errors_occurred(self, reply, errors):
-        self.controller.log("NETWORK ERROR - SSL errors while loading", reply.url())
-        print ">> SSL ERRORS LIST: ", errors
+        self.logger.network_error("SSL errors while loading", str(reply.url()))
         
     def webview_load_url(self, url = None):
         if url == None:
@@ -260,13 +366,13 @@ class UiController:
         self.browser_ui.webview_status_label.setText(status)
         self.browser_ui.url_line_edit.setText(self.browser_ui.webview.url().toString())
 
-    def load_reply_recieved(self, reply):
+    def load_reply_received(self, reply):
         attr_redir = reply.attribute(QNetworkRequest.RedirectionTargetAttribute)
         if not attr_redir.isNull():
             self.browser_ui.webview_status_label.setText("Redirecting...")
         if reply.error() != 0:
-            self.controller.log("NETWORK ERROR -", reply.errorString())
-            self.controller.log(">> Error code", str(reply.error()))
+            self.logger.network_error("NETWORK ERROR -", reply.errorString())
+            self.logger.network_error(">> Error code", str(reply.error()))
 
     def browser_control_clicked(self):
         if self.controller.connected:
@@ -274,39 +380,55 @@ class UiController:
         else:
             self.controller.end_auth()
             
+    def copy_item_link(self):
+        url = self.tree_controller.current_public_link
+        if url == None:
+            return
+        self.datahandler.copy_url_to_clipboard(url)
+    
     def open_item_link(self):
-        url = self.manager_ui.public_link_line_edit.text()
-        self.webview_load_url(url)
-        self.browser_ui.label_info.hide()
-        self.browser_ui.button_done.setText("Back")
-        self.browser_ui.button_done.setIcon(QIcon("ui/icons/back.png"))
-        self.switch_context("browser")
+        url = self.tree_controller.current_public_link
+        if url == None:
+            return
+        QDesktopServices.openUrl(QtCore.QUrl(url))
 
     def item_download(self):
         data = self.get_selected_data()
         if data == None:
             return
-
-        # This dialog shows strange stuff on maemo5
-        # It's a PyQt4 bug and its the best we got, you can cope with this
-        local_folder_path = QFileDialog.getExistingDirectory(None, "Select Download Folder", "/home/user/DropN900", QFileDialog.ShowDirsOnly|QFileDialog.HideNameFilterDetails|QFileDialog.ReadOnly)
-        if local_folder_path.isEmpty():
-            return
-        
-        store_path = local_folder_path + "/" + data.name
-        self.controller.connection.get_file(data.path, data.root, str(store_path))
+            
+        if self.datahandler.dont_show_dl_dialog == False:
+            # This dialog shows sometimes strange stuff on maemo5
+            # It's a PyQt4 bug and its the best we got, you can cope with this
+            if self.last_dl_location == None:
+                self.last_dl_location = self.datahandler.get_data_dir_path()
+            local_folder_path = QFileDialog.getExistingDirectory(self.manager_widget, QString("Select Download Folder"), QString(self.last_dl_location), QFileDialog.ShowDirsOnly|QFileDialog.HideNameFilterDetails|QFileDialog.ReadOnly)
+            if local_folder_path.isEmpty():
+                return
+            self.last_dl_location = str(local_folder_path)
+            store_path = local_folder_path + "/" + data.name
+        else:
+            dir_check = QDir(self.datahandler.get_data_dir_path())
+            if not dir_check.exists():
+                self.show_note("Cannot download, destination " + self.datahandler.get_data_dir_path() + " does not exist. Please set a new folder in settings.")
+                return
+            store_path = self.datahandler.get_data_dir_path() + data.name
+        self.controller.connection.get_file(data.path, data.root, str(store_path), data.get_size())
         
     def item_upload(self):
         data = self.get_selected_data()
         if data == None or not data.is_folder():
             return
 
-        # This dialog shows strange stuff on maemo5
+        # This dialog shows sometimes strange stuff on maemo5
         # It's a PyQt4 bug and its the best we got, you can cope with this
-        local_file_path = QFileDialog.getOpenFileName(self.manager_widget, "Select File for Upload", "/home/user")
+        if self.last_ul_location == None:
+            self.last_ul_location = self.datahandler.get_data_dir_path()
+        local_file_path = QFileDialog.getOpenFileName(self.manager_widget, QString("Select File for Upload"), QString(self.last_ul_location))
         if local_file_path.isEmpty():
             return
-
+        parse_path = str(local_file_path)
+        self.last_ul_location = parse_path[0:parse_path.rfind("/")]
         self.controller.connection.upload_file(data.path, data.root, str(local_file_path))
         
     def item_rename(self):
@@ -338,9 +460,9 @@ class UiController:
 
         # Get final new path and rename
         if data.parent == "/":
-            new_name = data.parent + new_name
+            new_name = data.parent + str(new_name)
         else:
-            new_name = data.parent + "/" + new_name
+            new_name = data.parent + "/" + str(new_name)
         self.controller.connection.rename(data.root, data.path, str(new_name), data)
 
     def item_remove(self):
@@ -365,7 +487,7 @@ class UiController:
         new_folder_name, ok = QInputDialog.getText(None, "Give new folder name", "")
         if not ok:
             return
-        if not self.is_name_valid(new_folder_name, "folder")
+        if not self.is_name_valid(new_folder_name, "folder"):
             return
         full_create_path = data.path + "/" + str(new_folder_name)
         self.controller.connection.create_folder(data.root, full_create_path, str(new_folder_name), data.path)
@@ -392,16 +514,20 @@ class UiController:
 
 class TreeController:
 
-    def __init__(self, tree_widget, controls_ui, logger):
+    def __init__(self, tree_widget, controls_ui, controller, logger):
         self.tree = tree_widget
         self.controls_ui = controls_ui
-        self.log = logger
+        self.controller = controller
+        self.datahandler = controller.datahandler
+        self.logger = logger
 
         self.root_folder = None
         self.last_clicked = None
         self.connection = None
         self.selected_data = None
-
+        self.current_public_link = None
+        self.loading_ui = None
+        
         # Treeview header init
         headers = self.tree.headerItem()
         headers.setTextAlignment(0, Qt.AlignLeft|Qt.AlignVCenter)
@@ -412,6 +538,12 @@ class TreeController:
         headers.setFont(0, font)
         headers.setFont(1, font)
 
+        # Click tracking
+        self.clicked_items = {}
+        
+        # Supported thumb image formats
+        self.supported_reader_formats = QImageReader.supportedImageFormats()
+        
         # Thumbs init
         self.thumbs = {}
 
@@ -421,14 +553,19 @@ class TreeController:
         # Connects
         self.tree.itemSelectionChanged.connect(self.item_selection_changed)
         self.tree.itemClicked.connect(self.item_clicked)
-        self.tree.itemDoubleClicked.connect(self.item_double_clicked)
+        #self.tree.itemDoubleClicked.connect(self.item_double_clicked)
         self.tree.itemExpanded.connect(self.item_expanded)
         self.tree.itemCollapsed.connect(self.item_collapsed)
 
-    def set_connection(self, connection):
+    def setup(self, connection):
         self.connection = connection
+        
+    def set_loading_ui(self, loading_ui):
+        self.loading_ui = loading_ui
 
     def item_expanded(self, tree_item):
+        self.tree.setCurrentItem(tree_item)
+        self.folder_opened(tree_item)
         self.set_icon("folder_opened", tree_item)
 
     def item_collapsed(self, tree_item):
@@ -449,7 +586,6 @@ class TreeController:
         root_item = QTreeWidgetItem(columns)
 
         self.set_icon(root_folder.mime_type, root_item)
-        self.update_link_area()
         
         self.tree.addTopLevelItem(root_item)
         root_item.setExpanded(True)
@@ -508,21 +644,36 @@ class TreeController:
         return None
         
     def get_data_for_item(self, tree_item):
-        item_name = tree_item.text(0)
-        if self.root_folder.get_name() == item_name:
+        name, path = self.parse_tree_item(tree_item)
+        if self.root_folder.get_name() == name and (path == "/DropBox" or path == "/DropN900"):
             data = self.root_folder
         else:
-            data = self.get_data_for_name(self.root_folder, item_name)
+            data = self.get_data_for_name(self.root_folder, name, path)
         return data
-
-    def get_data_for_name(self, folder, item_name):
+        
+    def parse_tree_item(self, tree_item):
+        item_path = []
+        item_path.append(str(tree_item.text(0)))
+        item_name = str(tree_item.text(0))
+        if tree_item.parent() != None:
+            current_item = tree_item
+            while current_item.parent() != None:
+                current_item = current_item.parent()
+                item_path.append(str(current_item.text(0)))
+            item_path.pop() # remove root item name from path
+        path_str = ""
+        for i in range(len(item_path)):
+            path_str += "/" + item_path.pop()
+        return item_name, path_str
+        
+    def get_data_for_name(self, folder, item_name, item_path):
         for item in folder.get_items():
-            if item.get_name() == item_name:
+            if item.get_name() == item_name and item.path == item_path:
                 return item
-            if item.is_folder():
-                data = self.get_data_for_name(item, item_name)
-                if data != None:
-                    return data
+        for folder in folder.get_folders():
+            data = self.get_data_for_name(folder, item_name, item_path)
+            if data != None:
+                return data
         return None
 
     def generate_children(self, parent):
@@ -589,13 +740,14 @@ class TreeController:
             # Create loading widget
             load_widget = QtGui.QLabel()
             load_widget.resize(30,30)
+            load_widget.setMaximumSize(30,50)
+            load_widget.setStyleSheet("QLabel { background-color: transparent; }")
 
             # Create animation
-            load_anim = QMovie("ui/images/loading_tree.gif", "GIF", load_widget)
+            load_anim = QMovie(self.datahandler.datapath("ui/images/loading_tree.gif"), "GIF", load_widget)
             load_anim.setCacheMode(QMovie.CacheAll)
             load_anim.setSpeed(150)
             load_anim.setScaledSize(QtCore.QSize(30,30))
-            load_widget.setMovie(load_anim)
 
             # Add to data model and tree
             child.set_load_widget(load_widget, load_anim)
@@ -608,7 +760,7 @@ class TreeController:
             del child
 
     def set_icon(self, item_type, tree_item, index = 0, label = None):
-        base_path = "ui/icons/"
+        base_path = self.controller.datahandler.app_root + "ui/icons/"
         base_type = item_type.split("/")[0]
         # item type
         if item_type == "folder":
@@ -649,9 +801,11 @@ class TreeController:
     def update_thumbnail(self, show, qpixmap = None):
         if qpixmap:
             self.controls_ui.thumb_container.setPixmap(qpixmap)
+        if self.loading_ui.info_label.isVisible():
+            show = False
         self.controls_ui.thumb_container.setVisible(show)
-            
-    # Signal handlers
+
+    # Qt signal handlers below
 
     def item_selection_changed(self):
         # We catch this as the N900 sometimes selected a item
@@ -669,9 +823,15 @@ class TreeController:
         self.last_clicked = item
 
         # Get data of clicked tree item
-        data = self.get_data_for_item(item)
+        if self.clicked_items.has_key(item):
+            data = self.clicked_items[item]
+        else:
+            data = self.get_data_for_item(item)
+            self.clicked_items[item] = data
+            
+        # Be sure that something was returned
         if data == None:
-            self.log("ERROR] Could not find data for tree item")
+            self.logger.error("Could not find data for clicked tree item.")
             return
 
         # Update ui with selected data
@@ -685,14 +845,12 @@ class TreeController:
             self.set_thumb(data.path, data.root)
         else:
             self.update_thumbnail(False)
-
+            
+        # Set selected data
         self.selected_data = data
 
-        # Enable public links once API gets
-        #if not data.is_folder():
-        #    self.update_link_area(data.public_link)
-        #else:
-        #    self.update_link_area()
+        # Show public link if present
+        self.update_link_area(data.public_link)
 
     def set_thumb(self, image_path, root, size = "large"):
         # Check if we already have the thumb
@@ -706,7 +864,7 @@ class TreeController:
         # Fetch thumb from web
         else:
             if not self.is_format_supported(image_path):
-                self.log("Format not supported, not fetching thumbnail for", image_path)
+                self.logger.warning("Format not supported, not fetching thumbnail for", image_path)
                 self.thumbs[image_path] = None # So we dont come here again
                 return
             self.connection.get_thumbnail(image_path, root, size)
@@ -715,26 +873,35 @@ class TreeController:
         # Check from qt if the format is accepptable
         format = image_path.split(".")[-1]
         try:
-            supported = QImageReader.supportedImageFormats()
-            supported.index(QtCore.QByteArray(format))
+            self.supported_reader_formats.index(QtCore.QByteArray(format.lower()))
             return True
         except ValueError:
             return False
 
-    def update_link_area(self, url = None):
-        show = False
-        if url != None:
-            show = True
-            self.controls_ui.public_link_line_edit.setText(url)
-        self.controls_ui.public_link_line_edit.setVisible(show)
-        self.controls_ui.button_open_public_link.setVisible(show)
+    def update_link_area(self, public_link_url):
+        show_link_controls = False
+        if public_link_url != None:
+            show_link_controls = True
+        self.controls_ui.button_copy_public_link.setVisible(show_link_controls)
+        self.controls_ui.button_open_public_link.setVisible(show_link_controls)
+        self.controls_ui.button_upload.setVisible(not show_link_controls)
+        self.controls_ui.button_new_folder.setVisible(not show_link_controls)
+        self.current_public_link = public_link_url
         
-    def item_double_clicked(self, item, column):
-        if item.isExpanded():
+    def folder_opened(self, item):
+        if not item.isExpanded():
             return
-        data = self.get_data_for_item(item)
+        # We always want to reset found tree items when we
+        # are building the tree up with metadata fetches
+        self.clicked_items = {}
+        data = self.selected_data
+        # Validity checks
+        if data == None:
+            self.logger.error("Could not find data for clicked tree item.")
+            return
         if not data.is_folder():
             return
+        # Start loading anim and get new metadata with hash
         self.start_load_anim(data)
         self.connection.get_metadata(data.path, data.root, data.hash)
         
@@ -755,4 +922,5 @@ class TreeController:
         self.load_animations = []
 
     def clear_all_load_animations(self):
-        self.load_animations = []        
+        self.load_animations = []      
+          

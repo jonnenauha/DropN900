@@ -1,0 +1,36 @@
+dropn900-0.1.2-1
+User interface
+* New: Tranfers widget that shows download/uplaod/sync progress and history
+* New: Settings UI where all DropN900 settings can be tweaked by the user. Stored to a config.
+* Qt style sheet and graphic updates
+* Utilizing more maemo banners and notes
+* Authentication UI shows more error information and requests connection when device has no networking
+* When waiting for a connection added the spinner animation
+* UI title and button name changes to be more descriptive
+* Console pretty printing via new logger.py
+* Download, upload and browse default dl location dialogs remember last traveled location
+* Expanding folders from the arrow icon in the tree view will now invoke a metadata fetch, previously only double cliking items did this.
+New functionality
+* You can now access the 'Public' folders public links. You can open them directly with the OS browser or copy to OS clipboard for pasting to eg. sms/chat/email.
+* Threaded non blocking file I/O. Fixes spinner animation and whole app freeze after download completed.
+* Application settings: set default download folder, toggle store location dialog on/off when downloading, store auth to file on/off, defining dropbox sync path and other sync settings.
+* Sync and Tranfer managers to handle transfers and UI updating.
+* More error checking and handling for everything that might fail. Informing user more about warnings and errors to log.
+
+dropn900-0.1.1-2 - 26.08.2010
+* Implemented network monitoring and reqeusting a connection from the device. Done with python-conic, python-gobject and python-dbus that are now new dependencies.
+* If there is no connection present or it is lost during browsing, dropn900 will connect to a saved connection or pop the maemo connection dialog up.
+* Implemented MaemoDataHandler that will make sure files are accessed from correct places.
+* Default download location changed to /home/user/MyDocs/DropN900
+* Package now creates .pyc files as a post-install step. This will make the app start up faster.
+* Implemented new logger that make color coded prints with log categories.
+* Console widget is no a Qt.WA_Maemo5StackedWindow with the nice animations and maemo back button.
+* Console widget log can be saved to a file.
+* Fixed typos in prints and removed unnecessary prints.
+
+dropn900-0.1.0-6 - 21.08.2010
+* Fixed PyQt4 network and webkit dependencies to package
+
+dropn900-0.1.0-5 - 21.08.2010
+* First release with basic functionality
+
