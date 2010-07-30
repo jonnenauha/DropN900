@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>800</width>
-    <height>562</height>
+    <height>474</height>
    </rect>
   </property>
   <property name="maximumSize">
@@ -202,9 +202,6 @@ QTreeView::branch:open:has-children:has-siblings  {
          </attribute>
          <attribute name="headerMinimumSectionSize">
           <number>40</number>
-         </attribute>
-         <attribute name="headerDefaultSectionSize">
-          <number>380</number>
          </attribute>
          <column>
           <property name="text">
@@ -450,7 +447,6 @@ QTreeView::branch:open:has-children:has-siblings  {
        <widget class="QPushButton" name="button_open_public_link">
         <property name="font">
          <font>
-          <family>Arial</family>
           <pointsize>16</pointsize>
          </font>
         </property>

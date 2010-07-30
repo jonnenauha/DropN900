@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'transferitem.ui'
 #
-# Created: Thu Jul 29 23:26:09 2010
+# Created: Fri Jul 30 15:00:22 2010
 #      by: PyQt4 UI code generator 4.6
 #
 # WARNING! All changes made in this file will be lost!
@@ -23,7 +23,7 @@ class Ui_TransferItem(object):
         self.content_frame.setObjectName("content_frame")
         self.horizontalLayout_3 = QtGui.QHBoxLayout(self.content_frame)
         self.horizontalLayout_3.setSpacing(0)
-        self.horizontalLayout_3.setContentsMargins(0, 6, 6, 6)
+        self.horizontalLayout_3.setContentsMargins(0, 6, 10, 6)
         self.horizontalLayout_3.setObjectName("horizontalLayout_3")
         self.main_layout = QtGui.QHBoxLayout()
         self.main_layout.setSpacing(0)
@@ -44,8 +44,20 @@ class Ui_TransferItem(object):
         self.labels_layout.setSpacing(0)
         self.labels_layout.setObjectName("labels_layout")
         self.horizontalLayout = QtGui.QHBoxLayout()
+        self.horizontalLayout.setContentsMargins(5, -1, -1, -1)
         self.horizontalLayout.setObjectName("horizontalLayout")
+        self.mime_icon = QtGui.QLabel(self.content_frame)
+        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Preferred)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.mime_icon.sizePolicy().hasHeightForWidth())
+        self.mime_icon.setSizePolicy(sizePolicy)
+        self.mime_icon.setMinimumSize(QtCore.QSize(20, 0))
+        self.mime_icon.setMaximumSize(QtCore.QSize(20, 16777215))
+        self.mime_icon.setObjectName("mime_icon")
+        self.horizontalLayout.addWidget(self.mime_icon)
         self.label_filename = QtGui.QLabel(self.content_frame)
+        self.label_filename.setIndent(7)
         self.label_filename.setObjectName("label_filename")
         self.horizontalLayout.addWidget(self.label_filename)
         spacerItem = QtGui.QSpacerItem(1, 1, QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
@@ -155,18 +167,6 @@ class Ui_TransferItem(object):
         self.horizontalLayout_4.addWidget(self.label_timestamp)
         self.labels_layout.addLayout(self.horizontalLayout_4)
         self.main_layout.addLayout(self.labels_layout)
-        self.sync_icon = QtGui.QLabel(self.content_frame)
-        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Preferred)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.sync_icon.sizePolicy().hasHeightForWidth())
-        self.sync_icon.setSizePolicy(sizePolicy)
-        self.sync_icon.setMinimumSize(QtCore.QSize(64, 0))
-        self.sync_icon.setMaximumSize(QtCore.QSize(64, 16777215))
-        self.sync_icon.setAlignment(QtCore.Qt.AlignCenter)
-        self.sync_icon.setIndent(0)
-        self.sync_icon.setObjectName("sync_icon")
-        self.main_layout.addWidget(self.sync_icon)
         self.horizontalLayout_3.addLayout(self.main_layout)
         self.horizontalLayout_2.addWidget(self.content_frame)
 
@@ -200,6 +200,7 @@ class Ui_TransferItem(object):
 "    font-size: 12pt;\n"
 "    color: rgb(218, 218, 218);\n"
 "}", None, QtGui.QApplication.UnicodeUTF8))
+        self.label_filename.setStyleSheet(QtGui.QApplication.translate("TransferItem", "margin-bottom: 3px;", None, QtGui.QApplication.UnicodeUTF8))
         self.label_filename.setText(QtGui.QApplication.translate("TransferItem", "Filename", None, QtGui.QApplication.UnicodeUTF8))
         self.label_status.setText(QtGui.QApplication.translate("TransferItem", "status", None, QtGui.QApplication.UnicodeUTF8))
         self.title_from.setText(QtGui.QApplication.translate("TransferItem", "from", None, QtGui.QApplication.UnicodeUTF8))

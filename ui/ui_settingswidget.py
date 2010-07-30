@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'settingswidget.ui'
 #
-# Created: Thu Jul 29 09:22:39 2010
+# Created: Sat Jul 31 00:50:54 2010
 #      by: PyQt4 UI code generator 4.6
 #
 # WARNING! All changes made in this file will be lost!
@@ -23,7 +23,7 @@ class Ui_SettingsWidget(object):
         self.scrollArea.setWidgetResizable(True)
         self.scrollArea.setObjectName("scrollArea")
         self.scrollAreaWidgetContents = QtGui.QWidget(self.scrollArea)
-        self.scrollAreaWidgetContents.setGeometry(QtCore.QRect(0, 0, 988, 1030))
+        self.scrollAreaWidgetContents.setGeometry(QtCore.QRect(0, -474, 988, 967))
         sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Expanding)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
@@ -201,11 +201,18 @@ class Ui_SettingsWidget(object):
         self.sync_buttons_layout = QtGui.QHBoxLayout()
         self.sync_buttons_layout.setSpacing(10)
         self.sync_buttons_layout.setObjectName("sync_buttons_layout")
+        self.main_layout.addLayout(self.sync_buttons_layout)
+        self.horizontalLayout_2 = QtGui.QHBoxLayout()
+        self.horizontalLayout_2.setObjectName("horizontalLayout_2")
+        self.checkbox_only_wlan_sync = QtGui.QCheckBox(self.scrollAreaWidgetContents)
+        self.checkbox_only_wlan_sync.setMinimumSize(QtCore.QSize(0, 65))
+        self.checkbox_only_wlan_sync.setObjectName("checkbox_only_wlan_sync")
+        self.horizontalLayout_2.addWidget(self.checkbox_only_wlan_sync)
         self.button_sync_now = QtGui.QPushButton(self.scrollAreaWidgetContents)
         self.button_sync_now.setMinimumSize(QtCore.QSize(0, 65))
         self.button_sync_now.setObjectName("button_sync_now")
-        self.sync_buttons_layout.addWidget(self.button_sync_now)
-        self.main_layout.addLayout(self.sync_buttons_layout)
+        self.horizontalLayout_2.addWidget(self.button_sync_now)
+        self.main_layout.addLayout(self.horizontalLayout_2)
         self.sync_layout = QtGui.QHBoxLayout()
         self.sync_layout.setSpacing(10)
         self.sync_layout.setObjectName("sync_layout")
@@ -229,15 +236,6 @@ class Ui_SettingsWidget(object):
         self.verticalLayout_2.setSpacing(10)
         self.verticalLayout_2.setMargin(15)
         self.verticalLayout_2.setObjectName("verticalLayout_2")
-        self.checkbox_only_wlan_sync = QtGui.QCheckBox(self.sync_frame)
-        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Fixed)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.checkbox_only_wlan_sync.sizePolicy().hasHeightForWidth())
-        self.checkbox_only_wlan_sync.setSizePolicy(sizePolicy)
-        self.checkbox_only_wlan_sync.setMinimumSize(QtCore.QSize(0, 65))
-        self.checkbox_only_wlan_sync.setObjectName("checkbox_only_wlan_sync")
-        self.verticalLayout_2.addWidget(self.checkbox_only_wlan_sync)
         self.horizontalLayout = QtGui.QHBoxLayout()
         self.horizontalLayout.setSpacing(10)
         self.horizontalLayout.setObjectName("horizontalLayout")
@@ -358,6 +356,15 @@ class Ui_SettingsWidget(object):
 "}", None, QtGui.QApplication.UnicodeUTF8))
         self.label_2.setStyleSheet(QtGui.QApplication.translate("SettingsWidget", "color: white;", None, QtGui.QApplication.UnicodeUTF8))
         self.label_2.setText(QtGui.QApplication.translate("SettingsWidget", "In order to select sync path you first need to be connected with a DropBox account. Secondly you need to have traveled to the desired path in the content view. The selection tool will be populated with the current sessions metadata. This is the only way to be sure that the sync location is valid.", None, QtGui.QApplication.UnicodeUTF8))
+        self.checkbox_only_wlan_sync.setStyleSheet(QtGui.QApplication.translate("SettingsWidget", "QCheckBox {\n"
+"    color: white;\n"
+"    font-size: 19pt;\n"
+"}\n"
+"\n"
+"QCheckBox::disabled {\n"
+"    color: grey;\n"
+"}", None, QtGui.QApplication.UnicodeUTF8))
+        self.checkbox_only_wlan_sync.setText(QtGui.QApplication.translate("SettingsWidget", "Only sync while on WLAN", None, QtGui.QApplication.UnicodeUTF8))
         self.button_sync_now.setText(QtGui.QApplication.translate("SettingsWidget", "Sync Folder Now", None, QtGui.QApplication.UnicodeUTF8))
         self.checkbox_enable_sync.setStyleSheet(QtGui.QApplication.translate("SettingsWidget", "QCheckBox {\n"
 "    color: white;\n"
@@ -377,15 +384,6 @@ class Ui_SettingsWidget(object):
 "QFrame:disabled#sync_frame {\n"
 "    border: 2px solid rgba(255,255,255,70);\n"
 "}", None, QtGui.QApplication.UnicodeUTF8))
-        self.checkbox_only_wlan_sync.setStyleSheet(QtGui.QApplication.translate("SettingsWidget", "QCheckBox {\n"
-"    color: white;\n"
-"    font-size: 19pt;\n"
-"}\n"
-"\n"
-"QCheckBox::disabled {\n"
-"    color: grey;\n"
-"}", None, QtGui.QApplication.UnicodeUTF8))
-        self.checkbox_only_wlan_sync.setText(QtGui.QApplication.translate("SettingsWidget", "Only auto sync on WLAN", None, QtGui.QApplication.UnicodeUTF8))
         self.label_update_every.setStyleSheet(QtGui.QApplication.translate("SettingsWidget", "QLabel {\n"
 "    color: white;\n"
 "    font-size: 19pt;\n"

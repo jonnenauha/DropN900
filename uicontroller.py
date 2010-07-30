@@ -413,7 +413,7 @@ class UiController:
                 self.show_note("Cannot download, destination " + self.datahandler.get_data_dir_path() + " does not exist. Please set a new folder in settings.")
                 return
             store_path = self.datahandler.get_data_dir_path() + data.name
-        self.controller.connection.get_file(data.path, data.root, str(store_path), data.get_size())
+        self.controller.connection.get_file(data.path, data.root, str(store_path), data.get_size(), data.mime_type)
         
     def item_upload(self):
         data = self.get_selected_data()

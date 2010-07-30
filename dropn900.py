@@ -28,15 +28,13 @@ class DropN900(QtCore.QObject):
         self.datahandler = MaemoDataHandler(self, maemo_env, self.logger)
         self.config_helper = ConfigHelper(self.datahandler, self.logger)
         
-        # Start and setup ui
+        # Setup ui
         self.ui = UiController(self, debug_mode, self.logger)
         self.logger.set_ui(self.ui)
         self.settings_widget = SettingsWidget(self.ui, self.config_helper, self.logger)
 
-        # Setup connection and pass to elements that need it
+        # Setup connection
         self.connection = ConnectionManager(self, self.ui, self.logger, maemo_env)
-        #self.ui.tree_controller.setup(self.connection)
-        #self.settings_widget.setup(self.connection)
         
         # Create transfer managers and widget
         self.sync_manager = SyncManager(self)
@@ -58,7 +56,6 @@ class DropN900(QtCore.QObject):
         self.request_token = None
         self.login_done = False
         self.connected = False
-        self.datahandler.startup_checks()
         # Start by checking existing auth
         self.check_for_auth(self.datahandler.configpath("token.ini"))
                 
@@ -129,7 +126,7 @@ class DropN900(QtCore.QObject):
       
 if __name__ == "__main__":
     app = QtGui.QApplication(sys.argv)
-    debug = True
+    debug = False
     maemo_env = True
     dropn900 = DropN900(debug, maemo_env)
     dropn900.start()

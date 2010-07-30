@@ -42,6 +42,9 @@ class ConfigHelper:
         # Store authentication
         self.datahandler.store_auth_to_file = authentication_data["store-auth"]
         
+        # Sync only on WLAN
+        self.datahandler.only_sync_on_wlan = automate_sync_data["only-sync-on-wlan"]
+        
     def get_current_settings(self):
         return self.current_settings
     
@@ -210,7 +213,7 @@ class SettingsWidget(QMainWindow):
         self.sync_manager = sync_manager
         
     def restore_defaults(self):
-        confirmation = QMessageBox.question(None, "Restore Sefault Values", "Are you sure?", QMessageBox.Yes, QMessageBox.Cancel)
+        confirmation = QMessageBox.question(None, " ", "Sure you want to restore default settings?", QMessageBox.Yes, QMessageBox.Cancel)
         if confirmation == QMessageBox.Cancel:
             return
         self.logger.config("Restoring default settings to config")
@@ -304,13 +307,14 @@ class SettingsWidget(QMainWindow):
     def set_sync_controls_enabled(self, enabled):
         self.ui.button_sync_now.setEnabled(enabled)
         self.ui.checkbox_enable_sync.setEnabled(enabled)
-        self.set_sync_widgets_enabled(enabled)
+        self.ui.checkbox_only_wlan_sync.setEnabled(enabled)
+        #self.set_sync_widgets_enabled(enabled)
     
     def set_sync_widgets_enabled(self, enabled):
         if not self.ui.checkbox_enable_sync.isChecked():
             enabled = False
         self.ui.sync_frame.setEnabled(enabled)
-        self.ui.checkbox_only_wlan_sync.setEnabled(enabled)
+        #self.ui.checkbox_only_wlan_sync.setEnabled(enabled)
         self.ui.label_update_every.setEnabled(enabled)
         self.ui.spinbox_sync_interval.setEnabled(enabled)
         self.ui.label_min.setEnabled(enabled)
@@ -325,12 +329,19 @@ class SettingsWidget(QMainWindow):
             sync_path = self.config_helper.get_current_settings()["automated-sync"]["sync-path"]
         else:
             sync_path = str(self.sync_path_button.valueText())
+            if sync_path != self.config_helper.get_current_settings()["automated-sync"]["sync-path"]:
+                self.parse_settings_from_ui()
         self.sync_manager.sync_now(sync_path)
         
     def showEvent(self, show_event):
         self.backup_settings = self.config_helper.get_current_settings()
         self.handle_root_folder(self.tree_controller.root_folder)
+        self.hide_unused()
         QWidget.showEvent(self, show_event)
+        
+    def hide_unused(self):
+        self.ui.checkbox_enable_sync.hide()
+        self.ui.sync_frame.hide()
         
     def hideEvent(self, hide_event):
         if self.store_settings:

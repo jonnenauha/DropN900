@@ -128,6 +128,7 @@ class MaemoDataHandler:
         self.logger = logger
         self.store_auth_to_file = True
         self.dont_show_dl_dialog = False
+        self.only_sync_on_wlan = True
         if self.maemo:
             self.user_home = str(QDir.home().absolutePath())
             self.app_root = "/opt/dropn900/"
@@ -139,6 +140,7 @@ class MaemoDataHandler:
             self.config_root = ""
             self.data_root = ""
             self.default_data_root = ""
+        self.startup_checks()
 
     def datapath(self, datafile):
         return self.app_root + datafile
@@ -153,12 +155,9 @@ class MaemoDataHandler:
         return self.data_root
         
     def startup_checks(self):
-        self.logger.info("Running Maemo startup checks...")
-        if QDir.home().absolutePath() != "/home/user":
-            self.logger.warning(">> home folder != /home/user")
         self.check_for_data_folder()
         self.check_for_config_folder()
-        
+
     def check_for_data_folder(self):
         if not self.maemo:
             return
@@ -167,19 +166,17 @@ class MaemoDataHandler:
             if data_dir.cd("MyDocs"):
                 if not data_dir.cd("DropN900"):
                     if data_dir.mkdir("DropN900"):
-                        self.logger.info(">> Created default data dir " + str(data_dir.absolutePath() + "/DropN900"))
+                        print ">> [INFO] Created default data dir " + str(data_dir.absolutePath()) + "/DropN900"
                     else:
-                        self.logger.error(">> Could not create default data dir 'DropN900' to " + str(data_dir.absolutePath()))
-                else:
-                    self.logger.info(">> Default data dir: " + str(data_dir.absolutePath()))
+                        print ">> [ERROR] Could not create default data dir 'DropN900' to " + str(data_dir.absolutePath())
             else:
-                self.logger.error(">> ERROR - Could not find 'MyDocs' folder from " + str(data_dir.absolutePath()))
+                print ">> [ERROR] Could not find 'MyDocs' folder from " + str(data_dir.absolutePath())
         else:
             non_default_data_dir = QDir(self.data_root)
             if non_default_data_dir.exists():
-                self.logger.info(">> Default data dir: " + self.data_root)
+                print ">> [INFO] Default data dir: " + self.data_root
             else:
-                self.logger.warning(">> User set default data dir " + self.data_root + " does not exist, resetting to default")
+                print ">> [WARNING] User set default data dir " + self.data_root + " does not exist, resetting to default"
                 self.data_root = self.user_home + "/MyDocs/DropN900/"
                 self.check_for_data_folder()
 
@@ -189,9 +186,9 @@ class MaemoDataHandler:
         config_dir = QDir.home()
         if not config_dir.cd(".dropn900"):
             if config_dir.mkdir(".dropn900"):
-                self.logger.info(">> Created config dir '.dropn900' to " + str(config_dir.absolutePath()))
+                print ">> [INFO] Created config dir '.dropn900' to " + str(config_dir.absolutePath())
             else:
-                self.logger.error(">> Could not create config dir '.dropn900' to " + str(config_dir.absolutePath()))
+                print ">> [ERROR] Could not create config dir '.dropn900' to " + str(config_dir.absolutePath())
 
     def store_auth(self, access_token):
         if self.store_auth_to_file:

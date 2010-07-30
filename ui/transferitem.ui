@@ -66,7 +66,7 @@ QLabel#label_timestamp, #label_status, #label_duration, #label_size {
        <number>6</number>
       </property>
       <property name="rightMargin">
-       <number>6</number>
+       <number>10</number>
       </property>
       <property name="bottomMargin">
        <number>6</number>
@@ -114,10 +114,44 @@ QLabel#label_timestamp, #label_status, #label_duration, #label_size {
           </property>
           <item>
            <layout class="QHBoxLayout" name="horizontalLayout">
+            <property name="leftMargin">
+             <number>5</number>
+            </property>
+            <item>
+             <widget class="QLabel" name="mime_icon">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="minimumSize">
+               <size>
+                <width>20</width>
+                <height>0</height>
+               </size>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>20</width>
+                <height>16777215</height>
+               </size>
+              </property>
+              <property name="text">
+               <string/>
+              </property>
+             </widget>
+            </item>
             <item>
              <widget class="QLabel" name="label_filename">
+              <property name="styleSheet">
+               <string>margin-bottom: 3px;</string>
+              </property>
               <property name="text">
                <string>Filename</string>
+              </property>
+              <property name="indent">
+               <number>7</number>
               </property>
              </widget>
             </item>
@@ -347,37 +381,6 @@ QLabel#label_timestamp, #label_status, #label_duration, #label_size {
            </layout>
           </item>
          </layout>
-        </item>
-        <item>
-         <widget class="QLabel" name="sync_icon">
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
-            <horstretch>0</horstretch>
-            <verstretch>0</verstretch>
-           </sizepolicy>
-          </property>
-          <property name="minimumSize">
-           <size>
-            <width>64</width>
-            <height>0</height>
-           </size>
-          </property>
-          <property name="maximumSize">
-           <size>
-            <width>64</width>
-            <height>16777215</height>
-           </size>
-          </property>
-          <property name="text">
-           <string/>
-          </property>
-          <property name="alignment">
-           <set>Qt::AlignCenter</set>
-          </property>
-          <property name="indent">
-           <number>0</number>
-          </property>
-         </widget>
         </item>
        </layout>
       </item>

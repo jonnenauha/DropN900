@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'consolewidget.ui'
 #
-# Created: Thu Jul 29 22:32:42 2010
+# Created: Sat Jul 31 00:50:58 2010
 #      by: PyQt4 UI code generator 4.6
 #
 # WARNING! All changes made in this file will be lost!
@@ -19,7 +19,8 @@ class Ui_ConsoleWidget(object):
         self.verticalLayout.setObjectName("verticalLayout")
         self.text_area = QtGui.QPlainTextEdit(ConsoleWidget)
         font = QtGui.QFont()
-        font.setFamily("Courier New")
+        font.setFamily("FreeMono")
+        font.setPointSize(12)
         self.text_area.setFont(font)
         self.text_area.setObjectName("text_area")
         self.verticalLayout.addWidget(self.text_area)
@@ -65,7 +66,6 @@ class Ui_ConsoleWidget(object):
 "    background-color: white;\n"
 "    border: 2px solid rgba(255,255,255,200);\n"
 "    border-radius: 10px;\n"
-"    font-size: 10pt;\n"
 "}\n"
 "\n"
 "QPushButton {\n"

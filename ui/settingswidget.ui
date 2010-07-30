@@ -35,9 +35,9 @@
       <property name="geometry">
        <rect>
         <x>0</x>
-        <y>0</y>
+        <y>-474</y>
         <width>988</width>
-        <height>1030</height>
+        <height>967</height>
        </rect>
       </property>
       <property name="sizePolicy">
@@ -522,6 +522,33 @@ QCheckBox::disabled {
            <property name="spacing">
             <number>10</number>
            </property>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_2">
+           <item>
+            <widget class="QCheckBox" name="checkbox_only_wlan_sync">
+             <property name="minimumSize">
+              <size>
+               <width>0</width>
+               <height>65</height>
+              </size>
+             </property>
+             <property name="styleSheet">
+              <string>QCheckBox {
+	color: white;
+	font-size: 19pt;
+}
+
+QCheckBox::disabled {
+	color: grey;
+}</string>
+             </property>
+             <property name="text">
+              <string>Only sync while on WLAN</string>
+             </property>
+            </widget>
+           </item>
            <item>
             <widget class="QPushButton" name="button_sync_now">
              <property name="minimumSize">
@@ -601,35 +628,6 @@ QFrame:disabled#sync_frame {
               <property name="margin">
                <number>15</number>
               </property>
-              <item>
-               <widget class="QCheckBox" name="checkbox_only_wlan_sync">
-                <property name="sizePolicy">
-                 <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-                  <horstretch>0</horstretch>
-                  <verstretch>0</verstretch>
-                 </sizepolicy>
-                </property>
-                <property name="minimumSize">
-                 <size>
-                  <width>0</width>
-                  <height>65</height>
-                 </size>
-                </property>
-                <property name="styleSheet">
-                 <string>QCheckBox {
-	color: white;
-	font-size: 19pt;
-}
-
-QCheckBox::disabled {
-	color: grey;
-}</string>
-                </property>
-                <property name="text">
-                 <string>Only auto sync on WLAN</string>
-                </property>
-               </widget>
-              </item>
               <item>
                <layout class="QHBoxLayout" name="horizontalLayout">
                 <property name="spacing">

@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'managerwidget.ui'
 #
-# Created: Thu Jul 29 04:43:23 2010
+# Created: Sat Jul 31 00:51:12 2010
 #      by: PyQt4 UI code generator 4.6
 #
 # WARNING! All changes made in this file will be lost!
@@ -12,7 +12,7 @@ from PyQt4 import QtCore, QtGui
 class Ui_ManagerWidget(object):
     def setupUi(self, ManagerWidget):
         ManagerWidget.setObjectName("ManagerWidget")
-        ManagerWidget.resize(800, 562)
+        ManagerWidget.resize(800, 474)
         ManagerWidget.setMaximumSize(QtCore.QSize(800, 16777215))
         ManagerWidget.setStyleSheet("""QFrame#frame_controls_bottom, #frame_controls_right {
     background: black;
@@ -257,7 +257,6 @@ QTreeView::branch:open:has-children:has-siblings  {
         self.verticalLayout_2.addWidget(self.button_copy_public_link)
         self.button_open_public_link = QtGui.QPushButton(self.frame_controls_right)
         font = QtGui.QFont()
-        font.setFamily("Arial")
         font.setPointSize(16)
         self.button_open_public_link.setFont(font)
         self.button_open_public_link.setObjectName("button_open_public_link")

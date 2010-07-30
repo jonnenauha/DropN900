@@ -3,6 +3,7 @@ import os
 
 from httplib import socket 
 from threading import Thread
+from collections import deque
 
 from PyQt4.QtCore import QObject, QTimer
 from data import DataParser, Collection, Resource
@@ -27,10 +28,11 @@ class ConnectionManager:
         self.poll_timer = QTimer()
         self.poll_timer.timeout.connect(self.thread_poller)
 
-        # Init running threads to empty
+        # Init thread params
         self.running_threads = []
-        self.running_data_workers = []
         self.queued_threads = []
+        self.active_data_worker = None
+        self.data_workers = deque()
         
         # DBus manager
         self.dbus_monitor = DBusMonitor(self, logger, maemo_env)
@@ -40,6 +42,16 @@ class ConnectionManager:
 
     def set_transfer_manager(self, transfer_manager):
         self.transfer_manager = transfer_manager
+    
+    def check_data_workers(self):
+        # Start next data worker if available
+        if self.active_data_worker == None:
+            try:
+                worker = self.data_workers.popleft()
+                worker.start()
+                self.active_data_worker = worker
+            except IndexError:
+                self.active_transfer = None
     
     def thread_poller(self):
         # Give gmainloop a iteration
@@ -68,26 +80,33 @@ class ConnectionManager:
             for removable in removable_network_threads:
                 self.running_threads.remove(removable)
                 del removable
-
-        # Check for completed data threads
-        if len(self.running_data_workers) > 0:
-            removable_data_threads = []
-            for data_thread in self.running_data_workers:
-                data_thread.join(0.01)
-                if not data_thread.isAlive():
-                    if data_thread.error != None:
-                        self.logger.error(data_thread.error)
-                    removable_data_threads.append(data_thread)
-            for removable in removable_data_threads:
-                self.running_data_workers.remove(removable)
-                del removable
+        
+        # Check for active data worker
+        if self.active_data_worker != None:
+            self.active_data_worker.join(0.01)
+            if not self.active_data_worker.isAlive():
+                if self.active_data_worker.error != None:
+                    self.logger.error(self.active_data_worker.error)
+                self.active_data_worker = None
+                self.check_data_workers()
                     
     def request_connection(self):
         self.dbus_monitor.request_connection()
         
     def connection_available(self):
         return self.dbus_monitor.device_has_networking
-        
+    
+    def connection_is_wlan(self):
+        if not self.connection_available():
+            return False
+        bearer = self.dbus_monitor.bearer
+        if bearer == None:
+            return False
+        if bearer.startswith("WLAN"):
+            return True
+        else:
+            return False
+            
     def set_connected(self, connected):
         if connected:
             self.ui_handler.hide_loading_ui()
@@ -245,14 +264,14 @@ class ConnectionManager:
             self.show_information("Thumbnail fetch failed, internal error", False)
 
     ### GET FILE HANDLERS
-    def get_file(self, path, root, store_path, size, sync_download = False):
+    def get_file(self, path, root, store_path, size, mime_type, sync_download = False):
         if not self.check_client:
             return
         file_name = path.split("/")[-1]
         dropbox_path = path[0:path.rfind("/")]
         if sync_download == False:
             self.show_information("Download queued\n" + file_name, None, 4000)
-        self.transfer_manager.handle_download(path, root, file_name, dropbox_path, store_path, size, sync_download)
+        self.transfer_manager.handle_download(path, root, file_name, dropbox_path, store_path, size, mime_type, sync_download)
         
     def get_file_callback(self, resp, params):
         if resp != None and params[0] != None and params[1] != None:
@@ -261,8 +280,8 @@ class ConnectionManager:
             if resp.status == 200:
                 store_worker = DataWorker("store")
                 store_worker.setup_store(store_path, resp)
-                store_worker.start()
-                self.running_data_workers.append(store_worker)
+                self.data_workers.append(store_worker)
+                self.check_data_workers()
             else:
                 self.logger.network_error(str(resp.status) + " - Could not download file to", store_path)
                 self.logger.network_error(">> Reason:", resp.read())
@@ -483,6 +502,4 @@ class DataWorker(Thread):
                 f.close()
             except IOError:
                 self.error = "Could not open " + self.file_path + " for file I/O"
-                
-                    
-        
+

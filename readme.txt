@@ -8,6 +8,10 @@ I wanted to make one. I use the dropbox provided python API client and PyQt4.
 Please visit the official thread of this app on maemo.org for more info
 http://talk.maemo.org/showthread.php?t=58882
 
+Release changelog
+=================
+See Changelog.txt
+
 Notes
 =====
 

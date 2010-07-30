@@ -1,10 +1,12 @@
 
 import os
 import time
+import simplejson
+import mimetypes
 
 from collections import deque
 
-from PyQt4.QtGui import QMainWindow, QWidget, QMessageBox, QPixmap, QMovie, QSpacerItem, QSizePolicy
+from PyQt4.QtGui import QMainWindow, QWidget, QMessageBox, QIcon, QPixmap, QMovie, QSpacerItem, QSizePolicy
 from PyQt4.QtCore import Qt, QTimer, QDateTime, QSize, QDir
 
 from data import Collection, Resource
@@ -48,33 +50,38 @@ class SyncManager:
             self.active_metadata_thread = None
                     
     def sync_now(self, sync_path):
-        if sync_path == "" or sync_path == "/":
-            self.ui.show_banner("Cannot synchronize, path / invalid")
-            self.logger.sync("Cannot synchronize, path / invalid")
-            return
-        if sync_path == "None":
-            self.ui.show_banner("Synchronizing disabled from settings", 2000)
-            return 
-        if sync_path[0] != "/":
-            self.ui.show_banner("Cannot synchronize, path '" + sync_path + "' invalid")
-            self.logger.sync("Cannot synchronize, path '" + sync_path + "' invalid")
+        if self.connection.client == None:
+            self.ui.show_banner("Cannot synchronize, not connected to Dropbox")
+            self.logger.sync("Cannot synchronize, no network connection")
             return
         if self.connection.connection_available() == False:
             self.ui.show_banner("Cannot synchronize, no network connection")
             self.logger.sync("Cannot synchronize, no network connection")
             return
+        if self.datahandler.only_sync_on_wlan:
+            if not self.connection.connection_is_wlan():
+                self.ui.show_banner("Synchronizing without WLAN disabled in settings", 4000)
+                return
         if self.active_metadata_thread != None:
             self.ui.show_banner("Synchronizing already in progress")
             self.logger.sync("Synchronizing already in progress")
             return
+        if sync_path == "" or sync_path == "/":
+            self.ui.show_banner("Cannot synchronize, path / invalid")
+            self.logger.sync("Cannot synchronize, path / invalid")
+            return
+        if sync_path == "None":
+            self.ui.show_banner("Synchronizing disabled in settings", 2000)
+            return 
+        if sync_path[0] != "/":
+            self.ui.show_banner("Cannot synchronize, path '" + sync_path + "' invalid")
+            self.logger.sync("Cannot synchronize, path '" + sync_path + "' invalid")
+            return
         dir_check = QDir(self.datahandler.get_data_dir_path())
         if not dir_check.exists():
-            self.ui.show_note("Cannot synchronize, destination " + self.datahandler.get_data_dir_path() + " does not exist. Please set a new folder in settings.")
+            self.ui.show_note("Cannot synchronize, download dir " + self.datahandler.get_data_dir_path() + " does not exist. Please set a new folder in settings.")
             return
-        
-        self.ui.show_banner("Synchronizing, please wait...", 2000)
-        self.logger.sync("Start: Fetching metadata for " + sync_path)
-  
+
         # Make metadata fetch thread
         metadata_worker = NetworkWorker()
         metadata_worker.set_callable(self.connection.client.metadata, "dropbox", sync_path, 10000, None)
@@ -87,7 +94,7 @@ class SyncManager:
     def sync_parse_response(self, response):
         if response != None:
             if response.status == 304: # content hasn't changed
-                self.logger.sync("Completed: Nothing to sync, content hash same")
+                self.logger.sync("Nothing to sync, content hash same")
                 return
             if response.status == 200: # ok
                 sync_file_list = self.parse_metadata(response.data)
@@ -96,7 +103,7 @@ class SyncManager:
                     return
                 if len(sync_file_list) == 0:
                     self.ui.show_banner("Nothing to sync, all files up to date")
-                    self.logger.sync("Completed: Nothing to sync, all files up to date")
+                    self.logger.sync("Nothing to sync, all files up to date")
                 else:
                     file_count = str(len(sync_file_list))
                     post_count = " file" if file_count == "1" else " files"
@@ -104,10 +111,15 @@ class SyncManager:
                     self.logger.sync("Starting " + file_count + " sync downloads")
                     store_dir = self.datahandler.get_data_dir_path()
                     for sync_file in sync_file_list:
-                        self.connection.get_file(sync_file.path, sync_file.root, store_dir + sync_file.get_name(), sync_file.size, True)
+                        self.connection.get_file(sync_file.path, sync_file.root, store_dir + sync_file.get_name(), sync_file.size, sync_file.mime_type, True)
                     self.ui.show_transfer_widget()
-            else: # path invalid
-                self.logger.sync_error("Could not fetch metadata for sync path, stopping sync")
+            else:
+                try:
+                    e = simplejson.loads(response.body)["error"]
+                except:
+                    e = "Invalid path"
+                self.ui.show_banner("Synchronizing failed - " + e)
+                self.logger.sync_error("Could not fetch metadata from sync path: " + e)
         
     def parse_metadata(self, data):
         try:
@@ -288,14 +300,14 @@ class TransferManager:
             except KeyError:
                 self.logger.warning("Could not find widget for started transfer")
                 
-    def handle_download(self, path, root, file_name, dropbox_path, device_store_path, size, sync_download):
+    def handle_download(self, path, root, file_name, dropbox_path, device_store_path, size, mime_type, sync_download):
         download = TransferWorker("Download")
         download.set_callable(self.client.get_file, root, path)
         download.set_callback(self.connection.get_file_callback, device_store_path, file_name)
         download.set_download_info(file_name, device_store_path)
         
         device_path = device_store_path[0:device_store_path.rfind("/")]
-        download_item = self.transfer_widget.add_download(file_name, dropbox_path, device_path, size, sync_download)
+        download_item = self.transfer_widget.add_download(file_name, dropbox_path, device_path, size, mime_type, sync_download)
         self.tranfer_to_widget[download] = download_item
         
         self.queued_transfer_threads.append(download)
@@ -354,8 +366,11 @@ class TransferWidget(QMainWindow):
         self.logger = transfer_manager.logger
         
         self.icon_download = QPixmap(self.datahandler.datapath("ui/icons/item_download.png"))
+        self.icon_download_sync = QPixmap(self.datahandler.datapath("ui/icons/item_download_sync.png"))
         self.icon_upload = QPixmap(self.datahandler.datapath("ui/icons/item_upload.png"))
+        self.icon_upload_sync = QPixmap(self.datahandler.datapath("ui/icons/item_upload_sync.png"))
         self.icon_sync = QPixmap(self.datahandler.datapath("ui/icons/item_sync.png"))
+
         self.icon_ok = QPixmap(self.datahandler.datapath("ui/icons/item_ok.png"))
         self.icon_error = QPixmap(self.datahandler.datapath("ui/icons/item_error.png")) 
         self.ui.label_first_time_icon.setPixmap(QPixmap(self.datahandler.datapath("ui/icons/transfer_manager.png")))
@@ -367,7 +382,7 @@ class TransferWidget(QMainWindow):
         if self.ui.label_first_time_note.isVisible():
             return
         if len(self.transfer_manager.queued_transfer_threads) > 0 or self.transfer_manager.active_transfer != None:
-            confirmation = QMessageBox.question(None, "Clear History", "There are still active transfers, are you sure?", QMessageBox.Yes, QMessageBox.Cancel)
+            confirmation = QMessageBox.question(None, " ", "There are still active transfers, clear history anyway?", QMessageBox.Yes, QMessageBox.Cancel)
             if confirmation == QMessageBox.Cancel:
                 return
             
@@ -400,10 +415,12 @@ class TransferWidget(QMainWindow):
                 self.ui.label_first_time_icon.hide()
         QWidget.showEvent(self, show_event)
         
-    def add_download(self, filename, from_path, to_path, size, sync_download):
+    def add_download(self, filename, from_path, to_path, size, mime_type, sync_download):
         download_item = TransferItem(self, "Download", sync_download)
-        download_item.set_icon(self.icon_download, True)
+        icon = self.icon_download if not sync_download else self.icon_download_sync
+        download_item.set_icon(icon, True)
         download_item.set_information(filename, from_path, to_path, size)
+        download_item.handle_mime_type(mime_type)
         
         self.ui.item_layout.insertWidget(0, download_item)
         download_item.show()
@@ -417,6 +434,8 @@ class TransferWidget(QMainWindow):
         upload_item = TransferItem(self, "Upload", False)
         upload_item.set_icon(self.icon_upload, True)
         upload_item.set_information(filename, from_path, to_path, size)
+        mime_type, encoding = mimetypes.guess_type(filename)
+        upload_item.handle_mime_type(mime_type)
 
         self.ui.item_layout.insertWidget(0, upload_item)
         upload_item.show()
@@ -457,17 +476,54 @@ class TransferItem(QWidget):
         
         self.sync_transfer = sync_transfer
         if self.sync_transfer:
-            self.ui.sync_icon.setPixmap(self.parent.icon_sync)
             self.ui.content_frame.setStyleSheet("QFrame#content_frame{border: 0px;border-bottom: 1px solid grey;background-color: qlineargradient(spread:pad, x1:0, y1:0.466182, x2:1, y2:1, stop:0 rgba(0, 0, 0, 255), stop:0.462312 rgba(11, 11, 64, 255), stop:1 rgba(22, 22, 22, 255));}")
-        else:
-            self.ui.sync_icon.hide()
 
+    def handle_mime_type(self, item_type):
+        if item_type == None:
+            self.ui.mime_icon.hide()
+            self.ui.label_filename.setIndent(0)
+            return
+        base_path = self.parent.datahandler.app_root + "ui/icons/"
+        base_type = item_type.split("/")[0]
+        # item type
+        icon = None
+        if item_type == "folder":
+            icon = QIcon(base_path + "folder.png")
+        elif item_type == "folder_opened":
+            icon = QIcon(base_path + "folder_open.png")
+        elif item_type == "n900":
+            icon = QIcon(base_path + "n900_small.png")
+        elif item_type == "size":
+            icon = QIcon(base_path + "calculator.png")
+        elif item_type == "time":
+            icon = QIcon(base_path + "clock.png")
+        elif item_type == "deleted_item":
+            icon = QIcon(base_path + "cancel.png")
+        elif item_type == "deleted_folder":
+            icon = QIcon(base_path + "folder_delete.png")
+        # base type (from mimetype pre /)
+        elif base_type == "text":
+            icon = QIcon(base_path + "document_edit.png")
+        elif base_type == "image":
+            icon = QIcon(base_path + "picture.png")
+        elif base_type == "application":
+            icon = QIcon(base_path + "applications.png")
+        else:
+            icon = QIcon(base_path + "document.png")
+        # set icon
+        if icon != None:
+            self.ui.mime_icon.setPixmap(icon.pixmap(20,20))
+        else:
+            print item_type
+            self.ui.mime_icon.hide()
+            self.ui.label_filename.setIndent(0)
+                 
     def set_information(self, filename, from_path, to_path, size):
         self.ui.label_filename.setText(filename)
         self.ui.label_from.setText(from_path)        
         self.ui.label_to.setText(to_path)
         self.ui.label_size.setText(size)
-        self.ui.label_duration.setText("Under 1 sec")
+        self.ui.label_duration.setText("< 1 sec")
         if size == "":
             self.ui.label_size.hide()
             self.ui.label_sep.hide()
@@ -523,7 +579,6 @@ class TransferItem(QWidget):
             status = self.transfer_type + " completed"
         if self.sync_transfer:
             status = "Sync " + status.lower()
-            color = "#6798cb;"
         self.set_status(status, color)       
         self.stop_animation()
         self.set_icon(self.initial_pixmap)

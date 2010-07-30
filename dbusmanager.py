@@ -14,6 +14,7 @@ class DBusMonitor:
         self.logger = logger
         self.device_has_networking = False
         self.connection = None
+        self.bearer = None
         
         self.gmainloop = gobject.MainLoop()
         self.mainloop_context = self.gmainloop.get_context()
@@ -72,10 +73,12 @@ class DBusMonitor:
                 message = "Device offline"
             self.device_has_networking = False
         elif status == conic.STATUS_DISCONNECTING:
-            pass
+            return
+        else:
+            return
         if message != None:
             self.logger.network(message)
         
+        self.bearer = bearer
         self.connection_manager.set_connected(self.device_has_networking)
-
 

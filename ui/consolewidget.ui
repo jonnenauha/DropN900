@@ -28,7 +28,6 @@ QPlainTextEdit#text_area {
 	background-color: white;
 	border: 2px solid rgba(255,255,255,200);
 	border-radius: 10px;
-	font-size: 10pt;
 }
 
 QPushButton {
@@ -72,8 +71,12 @@ QPushButton:pressed {
     <widget class="QPlainTextEdit" name="text_area">
      <property name="font">
       <font>
-       <family>Courier New</family>
+       <family>FreeMono</family>
+       <pointsize>12</pointsize>
       </font>
+     </property>
+     <property name="plainText">
+      <string/>
      </property>
     </widget>
    </item>

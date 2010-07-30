@@ -1,3 +1,6 @@
+dropn900-0.1.2-2
+* Fixed fatal bug: app crashed and burned on start up for users that did not have /home/user/.dropn900 config dir.
+
 dropn900-0.1.2-1
 User interface
 * New: Tranfers widget that shows download/uplaod/sync progress and history
