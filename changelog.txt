@@ -16,6 +16,8 @@ New functionality
 * Application settings: set default download folder, toggle store location dialog on/off when downloading, store auth to file on/off, defining dropbox sync path and other sync settings.
 * Sync and Tranfer managers to handle transfers and UI updating.
 * More error checking and handling for everything that might fail. Informing user more about warnings and errors to log.
+* Restore default settings. Found from Settings menu bar.
+* Clear transfer history. Confirmation if active tranfers. Found from Transfers menu bar.
 
 dropn900-0.1.1-2 - 26.08.2010
 * Implemented network monitoring and reqeusting a connection from the device. Done with python-conic, python-gobject and python-dbus that are now new dependencies.

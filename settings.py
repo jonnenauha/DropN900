@@ -5,7 +5,7 @@ from ConfigParser import ConfigParser, SafeConfigParser, NoSectionError, NoOptio
 
 from PyQt4 import QtMaemo5
 from PyQt4.QtCore import Qt, QDir, QString
-from PyQt4.QtGui import QWidget, QInputDialog, QFileDialog, QMessageBox, QStandardItemModel, QStandardItem, QVBoxLayout, QPixmap, QMessageBox
+from PyQt4.QtGui import QMainWindow, QWidget, QInputDialog, QFileDialog, QMessageBox, QStandardItemModel, QStandardItem, QVBoxLayout, QPixmap, QMessageBox
 from PyQt4.QtMaemo5 import QMaemo5ValueButton, QMaemo5ListPickSelector, QMaemo5TimePickSelector
 
 from ui.ui_settingswidget import Ui_SettingsWidget
@@ -76,9 +76,12 @@ class ConfigHelper:
         except NoOptionError, e:
             print "NoOptionError:", e
         
-    def write_default_settings(self):
+    def write_default_settings(self, force_dl_folder = False):
         download_data = {}
-        download_data["default-folder"] = self.datahandler.get_data_dir_path()
+        if force_dl_folder == False:
+            download_data["default-folder"] = self.datahandler.get_data_dir_path()
+        else:
+            download_data["default-folder"] = self.datahandler.default_data_root
         download_data["no-dialog"] = False
         
         authentication_data = {}
@@ -143,13 +146,15 @@ class ConfigHelper:
         
 """ SettingWidget is the DropN900 settings ui """
 
-class SettingsWidget(QWidget):
+class SettingsWidget(QMainWindow):
     
     def __init__(self, main_ui_handler, config_helper, logger):
-        QWidget.__init__(self, main_ui_handler.main_widget, Qt.Window)
+        QMainWindow.__init__(self, main_ui_handler.main_widget, Qt.Window)
         self.setAttribute(Qt.WA_Maemo5StackedWindow)
+        self.setWindowTitle("DropN900 - Settings")
+        self.setCentralWidget(QWidget())
         self.ui = Ui_SettingsWidget()
-        self.ui.setupUi(self)
+        self.ui.setupUi(self.centralWidget())
         
         self.main_ui_handler = main_ui_handler
         self.tree_controller = main_ui_handler.tree_controller
@@ -195,13 +200,24 @@ class SettingsWidget(QWidget):
             self.logger.config("Settings data from file invalid, writing defaults")
             self.config_helper.write_default_settings()
             init_settings = self.config_helper.get_current_settings()
-        else:
-            self.logger.config("Read application settings from config file")
         self.set_settings_to_ui(init_settings["download"], init_settings["authentication"], init_settings["automated-sync"])
-                
+        
+        action_restore_defaults = self.menuBar().addAction("Restore Defaults")
+        action_restore_defaults.triggered.connect(self.restore_defaults)
+        
     def setup(self, connection_manager, sync_manager):
         self.connection_manager = connection_manager
         self.sync_manager = sync_manager
+        
+    def restore_defaults(self):
+        confirmation = QMessageBox.question(None, "Restore Sefault Values", "Are you sure?", QMessageBox.Yes, QMessageBox.Cancel)
+        if confirmation == QMessageBox.Cancel:
+            return
+        self.logger.config("Restoring default settings to config")
+        self.config_helper.write_default_settings(True)
+        default_data = self.config_helper.get_current_settings()
+        self.set_settings_to_ui(default_data["download"], default_data["authentication"], default_data["automated-sync"])
+        self.select_config_sync_path(default_data["automated-sync"]["sync-path"])
         
     def handle_root_folder(self, root_folder):
         items = []
@@ -247,7 +263,7 @@ class SettingsWidget(QWidget):
         download_default_folder = self.ui.lineedit_default_download_folder.text()
         dir_check = QDir(download_default_folder)
         if not dir_check.exists():
-            confirmation = QMessageBox.question(None, "", "The folder " + str(download_default_folder) + " does not exist anymore. Define new folder now or reset to default?", QMessageBox.Yes, QMessageBox.Reset)
+            confirmation = QMessageBox.question(None, "Default Download Folder", "The folder " + str(download_default_folder) + " does not exist anymore. Define new folder now or reset to default?", QMessageBox.Yes, QMessageBox.Reset)
             if confirmation == QMessageBox.Yes:
                 self.set_default_dl_folder(False, self.datahandler.default_data_root)
             if confirmation == QMessageBox.Reset:

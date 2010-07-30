@@ -4,7 +4,7 @@ import time
 
 from collections import deque
 
-from PyQt4.QtGui import QWidget, QPixmap, QMovie
+from PyQt4.QtGui import QMainWindow, QWidget, QMessageBox, QPixmap, QMovie, QSpacerItem, QSizePolicy
 from PyQt4.QtCore import Qt, QTimer, QDateTime, QSize, QDir
 
 from data import Collection, Resource
@@ -339,13 +339,15 @@ class TransferWorker(NetworkWorker):
         
 """ TransferWidget is a tranfer monitoring widget """
 
-class TransferWidget(QWidget):
+class TransferWidget(QMainWindow):
 
     def __init__(self, transfer_manager):
-        QWidget.__init__(self, transfer_manager.ui.main_widget, Qt.Window)
+        QMainWindow.__init__(self, transfer_manager.ui.main_widget, Qt.Window)
         self.setAttribute(Qt.WA_Maemo5StackedWindow)
+        self.setWindowTitle("DropN900 - Transfers")
+        self.setCentralWidget(QWidget())
         self.ui = Ui_TransferWidget()
-        self.ui.setupUi(self)
+        self.ui.setupUi(self.centralWidget())
         
         self.transfer_manager = transfer_manager
         self.datahandler = transfer_manager.datahandler
@@ -356,11 +358,46 @@ class TransferWidget(QWidget):
         self.icon_sync = QPixmap(self.datahandler.datapath("ui/icons/item_sync.png"))
         self.icon_ok = QPixmap(self.datahandler.datapath("ui/icons/item_ok.png"))
         self.icon_error = QPixmap(self.datahandler.datapath("ui/icons/item_error.png")) 
-               
+        self.ui.label_first_time_icon.setPixmap(QPixmap(self.datahandler.datapath("ui/icons/transfer_manager.png")))
+        
+        action_clear = self.menuBar().addAction("Clear History")
+        action_clear.triggered.connect(self.clear_history)
+        
+    def clear_history(self):
+        if self.ui.label_first_time_note.isVisible():
+            return
+        if len(self.transfer_manager.queued_transfer_threads) > 0 or self.transfer_manager.active_transfer != None:
+            confirmation = QMessageBox.question(None, "Clear History", "There are still active transfers, are you sure?", QMessageBox.Yes, QMessageBox.Cancel)
+            if confirmation == QMessageBox.Cancel:
+                return
+            
+        rescue_widgets = [self.ui.label_first_time_note, self.ui.label_first_time_icon]
+        for w in rescue_widgets:
+            index = self.ui.item_layout.indexOf(w)
+            if index == -1:
+                return
+            l_item = self.ui.item_layout.itemAt(index)
+            self.ui.item_layout.removeItem(l_item)
+            
+        for nothing in range(self.ui.item_layout.count()):
+            child = self.ui.item_layout.takeAt(0)
+            widget_item = child.widget()
+            if widget_item != None:
+                widget_item.hide()
+                del widget_item
+            del child
+            
+        self.ui.label_first_time_note.setText("Tranfer history cleared")
+        self.ui.item_layout.insertSpacerItem(0, QSpacerItem(1, 1, QSizePolicy.Minimum, QSizePolicy.Expanding))
+        for w in rescue_widgets:
+            self.ui.item_layout.insertWidget(0, w)
+            w.show()
+        
     def showEvent(self, show_event):
-        if self.ui.item_layout.count() > 2:
+        if self.ui.item_layout.count() > 3:
             if self.ui.label_first_time_note.isVisible():
                 self.ui.label_first_time_note.hide()
+                self.ui.label_first_time_icon.hide()
         QWidget.showEvent(self, show_event)
         
     def add_download(self, filename, from_path, to_path, size, sync_download):
@@ -369,6 +406,11 @@ class TransferWidget(QWidget):
         download_item.set_information(filename, from_path, to_path, size)
         
         self.ui.item_layout.insertWidget(0, download_item)
+        download_item.show()
+        if self.ui.item_layout.count() > 3:
+            if self.ui.label_first_time_note.isVisible():
+                self.ui.label_first_time_note.hide()
+                self.ui.label_first_time_icon.hide()
         return download_item
         
     def add_upload(self, filename, from_path, to_path, size):
@@ -377,6 +419,11 @@ class TransferWidget(QWidget):
         upload_item.set_information(filename, from_path, to_path, size)
 
         self.ui.item_layout.insertWidget(0, upload_item)
+        upload_item.show()
+        if self.ui.item_layout.count() > 3:
+            if self.ui.label_first_time_note.isVisible():
+                self.ui.label_first_time_note.hide()
+                self.ui.label_first_time_icon.hide()
         return upload_item
         
         
