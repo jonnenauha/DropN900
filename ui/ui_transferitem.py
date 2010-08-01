@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'transferitem.ui'
 #
-# Created: Fri Jul 30 15:00:22 2010
+# Created: Sun Aug  1 07:08:42 2010
 #      by: PyQt4 UI code generator 4.6
 #
 # WARNING! All changes made in this file will be lost!
@@ -12,7 +12,7 @@ from PyQt4 import QtCore, QtGui
 class Ui_TransferItem(object):
     def setupUi(self, TransferItem):
         TransferItem.setObjectName("TransferItem")
-        TransferItem.resize(448, 96)
+        TransferItem.resize(448, 99)
         self.horizontalLayout_2 = QtGui.QHBoxLayout(TransferItem)
         self.horizontalLayout_2.setSpacing(0)
         self.horizontalLayout_2.setMargin(0)

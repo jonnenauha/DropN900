@@ -48,7 +48,7 @@ class DataParser:
                 if item["is_dir"]:
                     child = Collection(path, modified, icon, has_thumb, parent_root)
                 else:
-                    child = Resource(path, size, modified, item["mime_type"], icon, has_thumb, parent_root)
+                    child = Resource(path, size, item["bytes"], modified, item["mime_type"], icon, has_thumb, parent_root)
                     if path.startswith("/Public/"):
                         child.generate_public_link(self.uid)
                 folder.add_item(child)
@@ -254,6 +254,7 @@ class Item:
         self.public_link = None
         self.hash = None
         self.size = None
+        self.size_bytes = 0
 
         self.format_parent()
 
@@ -408,12 +409,13 @@ class Collection(Item):
 
 class Resource(Item):
 
-    def __init__(self, path, size, modified, mime_type, icon, has_thumb, root):
+    def __init__(self, path, size, size_bytes, modified, mime_type, icon, has_thumb, root):
         # Init parent class
         Item.__init__(self, path, root, modified, icon, has_thumb)
 
         # Init Resource params
         self.size = size
+        self.size_bytes = size_bytes
         self.mime_type = mime_type
         
         self.set_name()

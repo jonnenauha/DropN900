@@ -12,7 +12,12 @@ class DBusMonitor:
     def __init__(self, controller, logger, in_maemo):
         self.connection_manager = controller
         self.logger = logger
-        self.device_has_networking = False
+        self.device_has_networking = True
+        print "\n\nHACK"
+        print "HACK"
+        print "HACK"
+        print "HACK"
+        print "HACK\n\n"
         self.connection = None
         self.bearer = None
         

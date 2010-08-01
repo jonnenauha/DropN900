@@ -126,7 +126,7 @@ class DropN900(QtCore.QObject):
       
 if __name__ == "__main__":
     app = QtGui.QApplication(sys.argv)
-    debug = False
+    debug = True
     maemo_env = True
     dropn900 = DropN900(debug, maemo_env)
     dropn900.start()

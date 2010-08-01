@@ -6,7 +6,8 @@ import mimetypes
 
 from collections import deque
 
-from PyQt4.QtGui import QMainWindow, QWidget, QMessageBox, QIcon, QPixmap, QMovie, QSpacerItem, QSizePolicy
+from PyQt4.QtGui import QMainWindow, QWidget, QMessageBox, QIcon, QPixmap, QMovie, QLabel, QScrollArea
+from PyQt4.QtGui import QSpacerItem, QSizePolicy, QHBoxLayout, QVBoxLayout, QGridLayout
 from PyQt4.QtCore import Qt, QTimer, QDateTime, QSize, QDir
 
 from data import Collection, Resource
@@ -19,23 +20,44 @@ from ui.ui_transferitem import Ui_TransferItem
 class SyncManager:
 
     def __init__(self, controller):
+        self.controller = controller
         self.datahandler = controller.datahandler
         self.config_helper = controller.config_helper
         self.ui = controller.ui
         self.logger = controller.logger
         self.connection = controller.connection
-    
+           
         # Init poll timer
         self.poll_timer = QTimer()
         self.poll_timer.timeout.connect(self.thread_poller)
         
-        # Active metadata fetch
+        # Metadata threading variables
         self.active_metadata_thread = None
+        self.queued_metadata_threads = deque()
+        
+        # Active sync variables
         self.sync_metadata = None
+        self.sync_sub_folders_left = False
+        self.sync_ongoing = False
+        self.sync_fetching_sync_root = True
+        self.sync_root = None
+        self.sync_total_results = []
         
     def setup_automatic_sync(self):
         pass
         
+    def check_metadata_queue(self):
+        if self.active_metadata_thread == None:
+            try:
+                self.active_metadata_thread = self.queued_metadata_threads.popleft()
+                self.active_metadata_thread.start()
+                self.poll_timer.start()
+            except IndexError:
+                self.finish_sync()
+                self.sync_ongoing = False
+                self.active_metadata_thread = None
+                self.poll_timer.stop()
+                
     def thread_poller(self):
         if self.active_metadata_thread == None:
             self.poll_timer.stop()
@@ -43,11 +65,12 @@ class SyncManager:
         self.active_metadata_thread.join(0.01)
         if not self.active_metadata_thread.isAlive():
             if self.active_metadata_thread.error != None:
-                self.ui.show_banner("Sync error, check log")
-                self.logger.sync_error("Could not complete sync, network errors")
+                self.ui.show_banner("Could not complete sync, connection failed")
+                self.logger.sync_error("Could not complete sync, connection failed")
             self.sync_parse_response(self.active_metadata_thread.response)
             del self.active_metadata_thread
             self.active_metadata_thread = None
+            self.check_metadata_queue()
                     
     def sync_now(self, sync_path):
         if self.connection.client == None:
@@ -62,8 +85,11 @@ class SyncManager:
             if not self.connection.connection_is_wlan():
                 self.ui.show_banner("Synchronizing without WLAN disabled in settings", 4000)
                 return
-        if self.active_metadata_thread != None:
-            self.ui.show_banner("Synchronizing already in progress")
+        if len(self.connection.data_workers) > 0:
+            self.ui.show_banner("Data is still being written from previous downloads\nPlease wait a moment and try synchronizing again", 5000)
+            return
+        if self.sync_ongoing:
+            self.ui.show_banner("Synchronization already in progress")
             self.logger.sync("Synchronizing already in progress")
             return
         if sync_path == "" or sync_path == "/":
@@ -82,37 +108,33 @@ class SyncManager:
             self.ui.show_note("Cannot synchronize, download dir " + self.datahandler.get_data_dir_path() + " does not exist. Please set a new folder in settings.")
             return
 
+        self.sync_ongoing = True
+        self.sync_fetching_sync_root = True
+        self.sync_root = None
+        self.sync_total_results = []
+        
+        self.ui.show_banner("Preparing synchronization, please wait...", 2000)
+        
         # Make metadata fetch thread
         metadata_worker = NetworkWorker()
         metadata_worker.set_callable(self.connection.client.metadata, "dropbox", sync_path, 10000, None)
-        metadata_worker.start()
-    
-        # Start monitoring completion
-        self.active_metadata_thread = metadata_worker
-        self.poll_timer.start(100)
-        
+        self.queued_metadata_threads.append(metadata_worker)
+        self.check_metadata_queue()
+                           
     def sync_parse_response(self, response):
         if response != None:
-            if response.status == 304: # content hasn't changed
-                self.logger.sync("Nothing to sync, content hash same")
-                return
-            if response.status == 200: # ok
-                sync_file_list = self.parse_metadata(response.data)
-                if sync_file_list == None:
-                    self.ui.show_banner("Fatal sync error")
+            if response.status == 200:
+                sync_result = self.parse_metadata(response.data)
+                if sync_result == None:
+                    self.ui.show_banner("Fatal synchronization error, cannot continue")
+                    self.logger.sync_error("Fatal synchronization error, cannot continue")
                     return
-                if len(sync_file_list) == 0:
-                    self.ui.show_banner("Nothing to sync, all files up to date")
-                    self.logger.sync("Nothing to sync, all files up to date")
-                else:
-                    file_count = str(len(sync_file_list))
-                    post_count = " file" if file_count == "1" else " files"
-                    self.ui.show_banner("Synchronizing " + file_count + post_count)
-                    self.logger.sync("Starting " + file_count + " sync downloads")
-                    store_dir = self.datahandler.get_data_dir_path()
-                    for sync_file in sync_file_list:
-                        self.connection.get_file(sync_file.path, sync_file.root, store_dir + sync_file.get_name(), sync_file.size, sync_file.mime_type, True)
-                    self.ui.show_transfer_widget()
+                self.sync_total_results.append(sync_result)                
+                if sync_result.total_folders > 0:
+                    for child_folder in sync_result.fetch_meatadata_folders:
+                        metadata_worker = NetworkWorker()
+                        metadata_worker.set_callable(self.connection.client.metadata, "dropbox", child_folder.path, 10000, None)
+                        self.queued_metadata_threads.append(metadata_worker)
             else:
                 try:
                     e = simplejson.loads(response.body)["error"]
@@ -120,12 +142,14 @@ class SyncManager:
                     e = "Invalid path"
                 self.ui.show_banner("Synchronizing failed - " + e)
                 self.logger.sync_error("Could not fetch metadata from sync path: " + e)
+                
+        self.check_metadata_queue()
         
     def parse_metadata(self, data):
         try:
             if data["is_dir"]:        
                 parent_root = data["root"]
-                folder = Collection(data["path"], data["modified"], data["icon"], data["thumb_exists"], parent_root, data["hash"])
+                sync_folder = Collection(data["path"], data["modified"], data["icon"], data["thumb_exists"], parent_root, data["hash"])
                 # Add children to folder
                 for item in data["contents"]:
                     path = item["path"]
@@ -136,32 +160,207 @@ class SyncManager:
                     if item["is_dir"]:
                         child = Collection(path, modified, icon, has_thumb, parent_root)
                     else:
-                        child = Resource(path, size, modified, item["mime_type"], icon, has_thumb, parent_root)
-                    folder.add_item(child)
+                        child = Resource(path, size, item["bytes"], modified, item["mime_type"], icon, has_thumb, parent_root)
+                    sync_folder.add_item(child)
+                # Store root data
+                if self.sync_fetching_sync_root:
+                    self.sync_root = SyncRoot(sync_folder)    
+                    self.sync_fetching_sync_root = False
+                # Store sync results for this path
+                result = SyncResult(self.datahandler, sync_folder)
+                result.check_local_path(self.sync_root)
+                result.check_files_for_changes()
+                return result
             else:
                 self.ui.show_banner("Sync error, check log")
                 self.logger.sync_error("Sync path is not a folder, stopping sync")
-                return
+                return None
         except Exception, e:
             self.ui.show_banner("Sync error, check log")
             self.logger.sync_error("Parsing sync path metadata failed: " + str(e))
-            return
+            return None
+            
+    def finish_sync(self):
+        sync_confirmation = QMessageBox(self.ui.main_widget)
+        sync_confirmation.addButton("Continue", QMessageBox.YesRole)
+        sync_confirmation.addButton("Cancel", QMessageBox.NoRole)
+        sync_confirmation.setWindowTitle("Sync Download Confirmation")
+        
+        main_layout = QGridLayout()
+        main_layout.setHorizontalSpacing(30)
+        
+        # Titles
+        style = "QLabel { color: #0099FF; font-weight: bold;}"
+        l = QLabel("Path")
+        l.setStyleSheet(style)
+        main_layout.addWidget(l, 0, 0)
+        l = QLabel("Files")
+        l.setStyleSheet(style)
+        main_layout.addWidget(l, 0, 1)
+        l = QLabel("Size")
+        l.setStyleSheet(style)
+        main_layout.addWidget(l, 0, 2, Qt.AlignRight)
+        
+        # Information
+        row = 2
+        total_files = 0
+        total_folders = 0
+        total_bytes = 0
+        for result in self.sync_total_results:
+            folder_files = result.total_files
+            total_files += folder_files
+            folder_bytes = result.total_bytes
+            total_bytes += folder_bytes
+            if folder_files > 0:
+                total_folders += 1
+                layout = QHBoxLayout()
+                main_layout.addWidget(QLabel(result.remote_path), row, 0)
+                main_layout.addWidget(QLabel(str(folder_files)), row, 1)
+                main_layout.addWidget(QLabel(self.datahandler.humanize_bytes(folder_bytes)), row, 2, Qt.AlignRight)
+                row += 1
+
+        # Add total numbers
+        style = "QLabel { color: rgb(200,0,0); }"
+        l = QLabel("Total")
+        l.setStyleSheet(style)
+        main_layout.addWidget(l, 1, 0)
+        l = QLabel(str(total_files))
+        l.setStyleSheet(style)
+        main_layout.addWidget(l, 1, 1)
+        try:
+            total_size_string = self.datahandler.humanize_bytes(total_bytes)
+        except:
+            total_size_string = "unknown"
+        l = QLabel(total_size_string)
+        l.setStyleSheet(style)
+        main_layout.addWidget(l, 1, 2, Qt.AlignRight)
+        
+        # Make a scrollview
+        view_widget = QWidget()
+        view_widget_l = QVBoxLayout()
+        view_widget_l.addLayout(main_layout)
+        view_widget_l.addSpacerItem(QSpacerItem(1, 1, QSizePolicy.Minimum, QSizePolicy.Expanding))
+        view_widget.setLayout(view_widget_l)
+        view = QScrollArea()
+        view.setWidget(view_widget)
+        view.setWidgetResizable(True)
+        view.setMinimumHeight(300)
+        
+        # Show confirmation dialog
+        if total_files > 0:
+            sync_confirmation.layout().addWidget(view, 0, 0)
+            confirmation = sync_confirmation.exec_()
+            if confirmation == 1:
+                return
+            if confirmation == 0:
+                # Update ui and log
+                post_files = " file from " if total_files == 1 else " files from "
+                post_folders = " folder" if total_folders == 1 else " folders"
+                banner_total_size_string = ", total of " + total_size_string if total_size_string != "unknown" else ""
+                message = "Synchronizing " + str(total_files) + post_files + str(total_folders) + post_folders + banner_total_size_string
+                self.logger.sync(message)
+                # Request files from network
+                store_dir = self.datahandler.get_data_dir_path()
+                for sync_result in self.sync_total_results:
+                    if sync_result.local_folder_exists == False:
+                        sync_result.create_local_path()
+                    for sync_file in sync_result.out_of_date_files:
+                        self.connection.get_file(sync_file.path, sync_file.root, sync_result.local_path + "/" + sync_file.get_name(), sync_file.size, sync_file.mime_type, True)
+                self.controller.transfer_widget.add_sync_widget(self.sync_root.path, store_dir + self.sync_root.name, total_folders, total_files, total_size_string, None, None)
+                self.ui.show_transfer_widget()
+        else:
+            self.ui.show_banner("Nothing to synchronize, all file up to date")
+            self.logger.sync("Nothing to synchronize, all file up to date")
+
+
+""" SyncRoot has data about the main synchronization path """
+
+class SyncRoot:
+
+    def __init__(self, data):
+        self.path = data.path
+        self.name = data.name
+        
+        
+""" SyncResult has data about a path in the synchronization """
+
+class SyncResult:
+
+    def __init__(self, datahandler, sync_folder):
+        self.datahandler = datahandler
+        self.data = sync_folder
+        self.remote_path = sync_folder.path
+        self.local_path = None
+        self.local_folder_exists = False
+        
+        self.out_of_date_files = []
+        self.fetch_meatadata_folders = []
+        
+        self.total_folders = 0
+        self.total_files = 0
+        self.total_bytes = 0 
+        
+    def __str__(self):
+        print "SYNC RESULT"
+        print "> Remote path          :", self.remote_path
+        print "> Local path           :", self.local_path
+        print "> Create local folder? :", self.local_folder_exists
+        print "> Out of date files    :", str(len(self.out_of_date_files))
+        print "> Sub folders          :", str(len(self.fetch_meatadata_folders))
+        return ""
                 
-        self.sync_metadata = folder
-        download_list = []    
-        for child_file in self.sync_metadata.get_files():
+    def check_local_path(self, sync_root):
+        if self.remote_path ==  sync_root.path:
+            self.local_path = self.datahandler.datadirpath(sync_root.name)
+        elif self.remote_path.startswith(sync_root.path):
+            self.local_path = self.remote_path[len(sync_root.path):]
+            self.local_path = sync_root.name + self.local_path
+            self.local_path = self.datahandler.datadirpath(self.local_path)
+        else:
+            print "[DropN900] Error parsing path in SyncResult.check_local_path()"
+            return
+       
+        if os.path.exists(self.local_path):
+            self.local_folder_exists = True
+            
+    def create_local_path(self):
+        if self.total_files == 0:
+            return
+        if not os.path.exists(self.local_path): 
             try:
-                local_path = self.datahandler.datadirpath(child_file.get_name())
-                if os.path.exists(local_path):
-                    device_modified = time.strftime("%d.%m.%Y %H:%M:%S", time.gmtime(os.path.getmtime(local_path)))
-                    if self.is_remote_newer(device_modified, child_file.modified):
-                        download_list.append(child_file)
+                os.mkdir(self.local_path)
+                self.local_folder_exists = True
+            except OSError:
+                print "[DropN900] Failed to create folder in SyncResult.check_local_path(): ", self.local_path
+
+    def check_files_for_changes(self):
+        # Mark subfolders                
+        for child_folder in self.data.get_folders():
+            self.fetch_meatadata_folders.append(child_folder)
+            
+        # Mark out of date files
+        for child_file in self.data.get_files():
+            try:
+                if self.local_folder_exists == False:
+                    self.out_of_date_files.append(child_file)
                 else:
-                    download_list.append(child_file)
+                    local_file_path = self.local_path + "/" + child_file.get_name()
+                    if os.path.exists(local_file_path):
+                        device_modified = time.strftime("%d.%m.%Y %H:%M:%S", time.gmtime(os.path.getmtime(local_file_path)))
+                        if self.is_remote_newer(device_modified, child_file.modified):
+                            self.out_of_date_files.append(child_file)
+                    else:
+                        self.out_of_date_files.append(child_file)
             except OSError, e:
                 print e
-        return download_list
-
+        
+        # Calculate totals
+        self.total_folders = len(self.fetch_meatadata_folders)
+        self.total_files = len(self.out_of_date_files)
+        for f in self.out_of_date_files:
+            self.total_bytes += f.size_bytes
+    
+    """ Move along, nothing to see here :) Yeah, its ugly... but works. Remaking with std later. """
     def is_remote_newer(self, local_modified, remote_modified):
         ldata = self.parse_timestamp(local_modified)
         rdata = self.parse_timestamp(remote_modified)
@@ -218,7 +417,8 @@ class SyncManager:
         data["min"]   = int(time_parts[1])
         data["sec"]   = int(time_parts[2])
         return data
-    
+        
+        
 """ TransferManager monitors upload/downloads and relays info to TransferWidget """
 
 class TransferManager:
@@ -409,10 +609,7 @@ class TransferWidget(QMainWindow):
             w.show()
         
     def showEvent(self, show_event):
-        if self.ui.item_layout.count() > 3:
-            if self.ui.label_first_time_note.isVisible():
-                self.ui.label_first_time_note.hide()
-                self.ui.label_first_time_icon.hide()
+        self.layout_check()
         QWidget.showEvent(self, show_event)
         
     def add_download(self, filename, from_path, to_path, size, mime_type, sync_download):
@@ -424,10 +621,7 @@ class TransferWidget(QMainWindow):
         
         self.ui.item_layout.insertWidget(0, download_item)
         download_item.show()
-        if self.ui.item_layout.count() > 3:
-            if self.ui.label_first_time_note.isVisible():
-                self.ui.label_first_time_note.hide()
-                self.ui.label_first_time_icon.hide()
+        self.layout_check()
         return download_item
         
     def add_upload(self, filename, from_path, to_path, size):
@@ -439,13 +633,25 @@ class TransferWidget(QMainWindow):
 
         self.ui.item_layout.insertWidget(0, upload_item)
         upload_item.show()
+        self.layout_check()
+        return upload_item
+        
+    def add_sync_widget(self, sync_path, local_store_path, total_dl_folders, total_dl_files, total_dl_size, total_ul_files = None, total_ul_size = None):
+        sync_information = TransferItem(self, "Synchronization", True)
+        sync_information.set_icon(self.icon_sync, True)
+        sync_information.set_sync_information(sync_path, local_store_path, total_dl_folders, total_dl_files, total_dl_size)
+        
+        self.ui.item_layout.insertWidget(0, sync_information)
+        sync_information.show()
+        self.layout_check()
+                
+    def layout_check(self):
         if self.ui.item_layout.count() > 3:
             if self.ui.label_first_time_note.isVisible():
                 self.ui.label_first_time_note.hide()
                 self.ui.label_first_time_icon.hide()
-        return upload_item
-        
-        
+                
+                
 """ TransferItem is a custom list widget that shows tranfer data """
 
 class TransferItem(QWidget):
@@ -456,7 +662,6 @@ class TransferItem(QWidget):
         self.ui.setupUi(self)
         self.parent = parent
         
-        self.generate_timestamp(QDateTime.currentDateTime())
         self.status_style = "font-size: 12pt; color: "
         self.transfer_type = transfer_type
         self.set_status("Waiting")
@@ -471,6 +676,7 @@ class TransferItem(QWidget):
         self.duration_sec = 0
         self.duration_min = 0
         
+        self.ui.label_timestamp.hide()
         self.ui.label_duration.hide()
         self.ui.label_sep.hide()
         
@@ -527,6 +733,24 @@ class TransferItem(QWidget):
         if size == "":
             self.ui.label_size.hide()
             self.ui.label_sep.hide()
+            
+    def set_sync_information(self, sync_path, local_store_path, total_dl_folders, total_dl_files, total_dl_size):
+        self.handle_mime_type(None)
+        self.set_status(self.transfer_type, "#0099FF;")
+        self.generate_timestamp(QDateTime.currentDateTime())
+        self.ui.label_filename.setText(sync_path)
+        self.ui.label_size.setText("Total size " + total_dl_size)
+        self.ui.label_duration.hide()
+        self.ui.label_sep.hide()
+        self.ui.title_from.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        self.ui.title_from.setMaximumWidth(300)
+        self.ui.title_from.setText("Downloading")
+        self.ui.title_from.setIndent(5)
+        self.ui.title_from.setAlignment(Qt.AlignLeft|Qt.AlignVCenter)
+        post_files = " file from " if total_dl_files == 1 else " files from "
+        post_folders = " folder" if total_dl_folders == 1 else " folders"
+        self.ui.label_from.setText(str(total_dl_files) + post_files + str(total_dl_folders) + post_folders)
+        self.ui.label_to.setText(local_store_path)
         
     def set_duration(self):
         self.duration_sec += 1
@@ -542,7 +766,8 @@ class TransferItem(QWidget):
         self.ui.label_duration.setText(duration)
     
     def generate_timestamp(self, date_time_now):
-        self.ui.label_timestamp.setText(date_time_now.toString("dd.MM.yyyy HH:mm:ss"))   
+        self.ui.label_timestamp.setText(date_time_now.toString("dd.MM.yyyy HH:mm:ss"))
+        self.ui.label_timestamp.show()
         
     def set_icon(self, pixmap, initial_set = False):
         self.ui.main_icon.setPixmap(pixmap)
@@ -571,6 +796,7 @@ class TransferItem(QWidget):
     def set_started(self, status = None, color = "rgb(255,255,255);"):
         if status == None:
             status = self.transfer_type + "ing"
+        self.generate_timestamp(QDateTime.currentDateTime())
         self.set_status(status, color)
         self.start_animation()
         
