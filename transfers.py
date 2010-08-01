@@ -8,7 +8,7 @@ from collections import deque
 
 from PyQt4.QtGui import QMainWindow, QWidget, QMessageBox, QIcon, QPixmap, QMovie, QLabel, QScrollArea
 from PyQt4.QtGui import QSpacerItem, QSizePolicy, QHBoxLayout, QVBoxLayout, QGridLayout
-from PyQt4.QtCore import Qt, QTimer, QDateTime, QSize, QDir
+from PyQt4.QtCore import Qt, QObject, QTimer, QDateTime, QSize, QDir
 
 from data import Collection, Resource
 from connectionmanager import NetworkWorker
@@ -17,9 +17,10 @@ from ui.ui_transferitem import Ui_TransferItem
 
 """ Sync manager handles manual and automatic syncs """
 
-class SyncManager:
+class SyncManager(QObject):
 
     def __init__(self, controller):
+        QObject.__init__(self)
         self.controller = controller
         self.datahandler = controller.datahandler
         self.config_helper = controller.config_helper
@@ -28,7 +29,7 @@ class SyncManager:
         self.connection = controller.connection
            
         # Init poll timer
-        self.poll_timer = QTimer()
+        self.poll_timer = QTimer(self)
         self.poll_timer.timeout.connect(self.thread_poller)
         
         # Metadata threading variables
@@ -43,15 +44,12 @@ class SyncManager:
         self.sync_root = None
         self.sync_total_results = []
         
-    def setup_automatic_sync(self):
-        pass
-        
     def check_metadata_queue(self):
         if self.active_metadata_thread == None:
             try:
                 self.active_metadata_thread = self.queued_metadata_threads.popleft()
                 self.active_metadata_thread.start()
-                self.poll_timer.start()
+                self.poll_timer.start(50)
             except IndexError:
                 self.finish_sync()
                 self.sync_ongoing = False
@@ -85,6 +83,9 @@ class SyncManager:
             if not self.connection.connection_is_wlan():
                 self.ui.show_banner("Synchronizing without WLAN disabled in settings", 4000)
                 return
+        if len(self.controller.transfer_manager.queued_transfer_threads) > 0 or self.controller.transfer_manager.active_transfer != None:
+            self.ui.show_banner("There are ongoing active transfers\nPlease wait for them to complete")
+            return    
         if len(self.connection.data_workers) > 0:
             self.ui.show_banner("Data is still being written from previous downloads\nPlease wait a moment and try synchronizing again", 5000)
             return
@@ -328,7 +329,7 @@ class SyncResult:
             return
         if not os.path.exists(self.local_path): 
             try:
-                os.mkdir(self.local_path)
+                os.makedirs(self.local_path)
                 self.local_folder_exists = True
             except OSError:
                 print "[DropN900] Failed to create folder in SyncResult.check_local_path(): ", self.local_path
@@ -421,9 +422,10 @@ class SyncResult:
         
 """ TransferManager monitors upload/downloads and relays info to TransferWidget """
 
-class TransferManager:
+class TransferManager(QObject):
 
     def __init__(self, controller):
+        QObject.__init__(self)
         self.datahandler = controller.datahandler
         self.config_helper = controller.config_helper
         self.ui = controller.ui
@@ -438,7 +440,7 @@ class TransferManager:
         self.show_information = self.connection.show_information
         
         # Init poll timer
-        self.poll_timer = QTimer()
+        self.poll_timer = QTimer(self)
         self.poll_timer.timeout.connect(self.thread_poller)
         
         # Init thread monitoring
@@ -454,11 +456,19 @@ class TransferManager:
     def set_transfer_widget(self, transfer_widget):
         self.transfer_widget = transfer_widget
         
-    def start_poller(self, timeout_msec = 100):
+    def start_poller(self, timeout_msec = 50):
         self.poll_timer.start(timeout_msec)
         
     def stop_poller(self):
          self.poll_timer.stop()
+         
+    def get_transfer_widget(self, transfer):
+        try:
+            transfer_widget = self.tranfer_to_widget[self.active_transfer]
+        except KeyError:
+            self.logger.transfer_error("Could not find transfer widget!")
+            transfer_widget = None
+        return transfer_widget
 
     def thread_poller(self):
         if self.active_transfer == None:
@@ -466,26 +476,18 @@ class TransferManager:
             return
         self.active_transfer.join(0.01)
         if not self.active_transfer.isAlive():
-            if self.active_transfer.error != None:
-                try:
-                    self.tranfer_to_widget[self.active_transfer].set_failed()
-                except KeyError:
-                    self.logger.warning("Could not find widget for failed transfer")
-                self.logger.transfer_error(self.active_transfer.transfer_type + " of " + self.active_transfer.file_name + " failed, no connection?")
-                self.logger.transfer_error(">>" + str(self.active_transfer.error))
             transfer = self.active_transfer
+            transfer_widget = self.get_transfer_widget(transfer)
             self.active_transfer = None
-            self.check_transfer_queue()
+            if transfer.error != None:
+                transfer_widget.set_failed()
+                self.logger.transfer_error(transfer.transfer_type + " of " + transfer.file_name + " failed, no connection?")
+                self.logger.transfer_error(">>" + str(transfer.error))
             if transfer.response != None:
-                try:
-                    self.tranfer_to_widget[transfer].set_completed()
-                except KeyError:
-                    self.logger.warning("Could not find widget for completed transfer")
-                if transfer.callback_parameters != None:
-                    transfer.callback(transfer.response, transfer.callback_parameters)
-                else:
-                    transfer.callback(transfer.response)
+                transfer_widget.set_completed()
+                transfer.callback(transfer.response, transfer.data, transfer.callback_parameters)
             del transfer
+            self.check_transfer_queue()
 
     def check_transfer_queue(self):
         if self.active_transfer == None:
@@ -539,6 +541,7 @@ class TransferWorker(NetworkWorker):
         self.transfer_type = transfer_type
         self.file_name = None
         self.store_path = None
+        self.data = None
 
     def set_download_info(self, file_name, device_store_path):
         self.file_name = file_name
@@ -548,6 +551,18 @@ class TransferWorker(NetworkWorker):
         self.file_name = file_name
         self.store_path = dropbox_store_path
 
+    def run(self):
+        try:
+            self.response = self.method(*self.parameters)
+            if self.response != None:
+                self.data = self.response.read()
+            else:
+                self.error = "Response None, with status code " + self.response.status
+                self.data = None
+        except (socket.error, socket.gaierror), err:
+            self.response = None
+            self.error = err
+            self.data = None
         
 """ TransferWidget is a tranfer monitoring widget """
 
@@ -682,7 +697,8 @@ class TransferItem(QWidget):
         
         self.sync_transfer = sync_transfer
         if self.sync_transfer:
-            self.ui.content_frame.setStyleSheet("QFrame#content_frame{border: 0px;border-bottom: 1px solid grey;background-color: qlineargradient(spread:pad, x1:0, y1:0.466182, x2:1, y2:1, stop:0 rgba(0, 0, 0, 255), stop:0.462312 rgba(11, 11, 64, 255), stop:1 rgba(22, 22, 22, 255));}")
+            self.ui.content_frame.setStyleSheet("QFrame#content_frame{border: 0px;border-bottom: 1px solid grey;background-color: \
+            qlineargradient(spread:pad, x1:0, y1:0.466182, x2:1, y2:1, stop:0 rgba(0, 0, 0, 255), stop:0.462312 rgba(11, 11, 64, 255), stop:1 rgba(22, 22, 22, 255));}")
 
     def handle_mime_type(self, item_type):
         if item_type == None:
@@ -720,7 +736,6 @@ class TransferItem(QWidget):
         if icon != None:
             self.ui.mime_icon.setPixmap(icon.pixmap(20,20))
         else:
-            print item_type
             self.ui.mime_icon.hide()
             self.ui.label_filename.setIndent(0)
                  
@@ -808,7 +823,8 @@ class TransferItem(QWidget):
         self.set_status(status, color)       
         self.stop_animation()
         self.set_icon(self.initial_pixmap)
-        self.ui.content_frame.setStyleSheet("QFrame#content_frame{border: 0px;border-bottom: 1px solid grey;background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, stop:0 rgba(0, 7, 0, 255), stop:0.502513 rgba(0, 50, 0, 200), stop:1 rgba(0, 0, 0, 255));}")
+        self.ui.content_frame.setStyleSheet("QFrame#content_frame{border: 0px;border-bottom: 1px solid grey;background-color: \
+        qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, stop:0 rgba(0, 7, 0, 255), stop:0.502513 rgba(0, 50, 0, 200), stop:1 rgba(0, 0, 0, 255));}")
 
     def set_failed(self, status = None, color = "rgb(200,0,0);"):
         if status == None:
@@ -818,5 +834,6 @@ class TransferItem(QWidget):
         self.set_status(status, color)
         self.stop_animation()
         self.set_icon(self.parent.icon_error)
-        self.ui.content_frame.setStyleSheet("QFrame#content_frame{border: 0px;border-bottom: 1px solid grey;background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, stop:0 rgba(0, 0, 0, 255), stop:0.512563 rgba(64, 0, 0, 255), stop:1 rgba(6, 6, 6, 255));}")
-                
+        self.ui.content_frame.setStyleSheet("QFrame#content_frame{border: 0px;border-bottom: 1px solid grey;background-color: \
+        qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, stop:0 rgba(0, 0, 0, 255), stop:0.512563 rgba(64, 0, 0, 255), stop:1 rgba(6, 6, 6, 255));}")
+

@@ -6,7 +6,7 @@ from ConfigParser import ConfigParser, SafeConfigParser, NoSectionError, NoOptio
 from PyQt4 import QtMaemo5
 from PyQt4.QtCore import Qt, QDir, QString
 from PyQt4.QtGui import QMainWindow, QWidget, QInputDialog, QFileDialog, QMessageBox, QStandardItemModel, QStandardItem, QVBoxLayout, QPixmap, QMessageBox
-from PyQt4.QtMaemo5 import QMaemo5ValueButton, QMaemo5ListPickSelector, QMaemo5TimePickSelector
+from PyQt4.QtMaemo5 import QMaemo5ValueButton, QMaemo5ListPickSelector
 
 from ui.ui_settingswidget import Ui_SettingsWidget
 
@@ -290,7 +290,6 @@ class SettingsWidget(QMainWindow):
         self.config_helper.datahandler.reset_auth()
         
     def set_default_dl_folder(self, magic, open_in_path = None):
-        print open_in_path
         if open_in_path == None:
             open_in_path = self.ui.lineedit_default_download_folder.text()
         local_folder_path = QFileDialog.getExistingDirectory(None, QString("Select Default Download Folder"), QString(open_in_path), (QFileDialog.ShowDirsOnly|QFileDialog.HideNameFilterDetails|QFileDialog.ReadOnly))

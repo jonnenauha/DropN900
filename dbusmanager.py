@@ -4,34 +4,36 @@ import dbus
 import dbus.glib
 import gobject
 
+from PyQt4.QtCore import QObject
+
 """ DBus connection monitor. Monitors device internet connection and can requests one if needed.
     most code taken from PyMaemo conic examples http://pymaemo.garage.maemo.org/conic.html """
 
-class DBusMonitor:
+class DBusMonitor(QObject):
     
-    def __init__(self, controller, logger, in_maemo):
+    def __init__(self, controller, logger):
+        QObject.__init__(self)
         self.connection_manager = controller
         self.logger = logger
-        self.device_has_networking = True
-        print "\n\nHACK"
-        print "HACK"
-        print "HACK"
-        print "HACK"
-        print "HACK\n\n"
+        self.device_has_networking = False
         self.connection = None
         self.bearer = None
-        
+
+        # Note prints so I wont forget the hack on for releases
+        if self.device_has_networking:
+            print "\n" + 10 * " >> >> NOTE: Scratchbox networking enabled hack in use!\n"
+
         self.gmainloop = gobject.MainLoop()
         self.mainloop_context = self.gmainloop.get_context()
         self.bus = dbus.SystemBus(private=True)
         
         gobject.threads_init()
-        if in_maemo:
-            self.start_monitoring()
-        else:
-            # For scratchbox development
-            self.device_has_networking = True
+        self.start_monitoring() 
+        self.startTimer(250)
         
+    def timer_event(self, q_timer_event):
+        self.iteration()
+                
     def iteration(self):
         self.mainloop_context.iteration(True)
         
@@ -60,8 +62,6 @@ class DBusMonitor:
         bearer = event.get_bearer_type()    
         
         if status == conic.STATUS_CONNECTED:
-            # Sometimes connected comes twice, we'll ignore the second one
-            # as we fetch the root metadata or allow login when connected
             if self.device_has_networking:
                 return
             if bearer != None:

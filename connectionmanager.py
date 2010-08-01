@@ -13,9 +13,10 @@ from dbusmanager import DBusMonitor
     with python threads so it wont block the main ui thread. Returs data either to
     DataParser or relays itself it to ui layer """
 
-class ConnectionManager:
+class ConnectionManager(QObject):
 
-    def __init__(self, controller, ui_handler, logger, maemo_env):
+    def __init__(self, controller, ui_handler, logger):
+        QObject.__init__(self)
         self.controller = controller
         self.data_parser = DataParser(ui_handler, logger)
         self.ui_handler = ui_handler
@@ -25,7 +26,7 @@ class ConnectionManager:
         self.transfer_manager = None
 
         # Init poll timer
-        self.poll_timer = QTimer()
+        self.poll_timer = QTimer(self)
         self.poll_timer.timeout.connect(self.thread_poller)
 
         # Init thread params
@@ -35,11 +36,11 @@ class ConnectionManager:
         self.data_workers = deque()
         
         # DBus manager
-        self.dbus_monitor = DBusMonitor(self, logger, maemo_env)
+        self.dbus_monitor = DBusMonitor(self, logger)
         
         # Start the thread poller
-        self.poll_timer.start(200)
-
+        self.poll_timer.start(100)
+    
     def set_transfer_manager(self, transfer_manager):
         self.transfer_manager = transfer_manager
     
@@ -54,9 +55,6 @@ class ConnectionManager:
                 self.active_transfer = None
     
     def thread_poller(self):
-        # Give gmainloop a iteration
-        self.dbus_monitor.iteration()
-        
         # Check for completed network threads
         if len(self.running_threads) > 0:
             removable_network_threads = []
@@ -80,13 +78,13 @@ class ConnectionManager:
             for removable in removable_network_threads:
                 self.running_threads.remove(removable)
                 del removable
-        
+                
         # Check for active data worker
         if self.active_data_worker != None:
             self.active_data_worker.join(0.01)
             if not self.active_data_worker.isAlive():
                 if self.active_data_worker.error != None:
-                    self.logger.error(self.active_data_worker.error)
+                    self.logger.error("DataWorker error: " + self.active_data_worker.error)
                 self.active_data_worker = None
                 self.check_data_workers()
                     
@@ -273,13 +271,13 @@ class ConnectionManager:
             self.show_information("Download queued\n" + file_name, None, 4000)
         self.transfer_manager.handle_download(path, root, file_name, dropbox_path, store_path, size, mime_type, sync_download)
         
-    def get_file_callback(self, resp, params):
+    def get_file_callback(self, resp, data, params):
         if resp != None and params[0] != None and params[1] != None:
             store_path = params[0]
             file_name = params[1]
             if resp.status == 200:
                 store_worker = DataWorker("store")
-                store_worker.setup_store(store_path, resp)
+                store_worker.setup_store(store_path, data)
                 self.data_workers.append(store_worker)
                 self.check_data_workers()
             else:
@@ -497,9 +495,12 @@ class DataWorker(Thread):
     def run(self):
         if self.action == "store":
             try:
-                f = open(self.file_path, "wb")
-                f.write(self.data.read())
-                f.close()
-            except IOError:
-                self.error = "Could not open " + self.file_path + " for file I/O"
+                if self.data != None:
+                    f = open(self.file_path, "wb")
+                    f.write(self.data)
+                    f.close()
+                else:
+                    self.error = "Data is 'None' skipping file " + self.file_path
+            except IOError, e:
+                self.error = "Could not open " + self.file_path + " for file I/O: " + str(e)
 

@@ -3,7 +3,9 @@
 import sys
 import os
 
-from PyQt4 import QtCore, QtGui
+from PyQt4.QtCore import QObject, QEvent
+from PyQt4.QtGui import QApplication
+
 from dropbox import client, rest, auth
 from oauth import oauth
 from httplib import socket 
@@ -19,22 +21,26 @@ from transfers import SyncManager, TransferManager, TransferWidget
 
 """ Main programs controller, instantiates all the nessesary classes, starts ui and auth """
 
-class DropN900(QtCore.QObject):
+class DropN900(QApplication):
 
-    def __init__(self, debug_mode = False, maemo_env = True):
-        self.logger = Logger(debug_mode)
+    def __init__(self, debug = False):
+        QApplication.__init__(self, sys.argv)
+        self.installEventFilter(self)
+        
+        # Logger
+        self.logger = Logger(debug)
         
         # Setup data handler and config helper
-        self.datahandler = MaemoDataHandler(self, maemo_env, self.logger)
+        self.datahandler = MaemoDataHandler(self, self.logger)
         self.config_helper = ConfigHelper(self.datahandler, self.logger)
         
         # Setup ui
-        self.ui = UiController(self, debug_mode, self.logger)
+        self.ui = UiController(self, debug, self.logger)
         self.logger.set_ui(self.ui)
         self.settings_widget = SettingsWidget(self.ui, self.config_helper, self.logger)
 
         # Setup connection
-        self.connection = ConnectionManager(self, self.ui, self.logger, maemo_env)
+        self.connection = ConnectionManager(self, self.ui, self.logger)
         
         # Create transfer managers and widget
         self.sync_manager = SyncManager(self)
@@ -47,7 +53,7 @@ class DropN900(QtCore.QObject):
         self.ui.set_settings_widget(self.settings_widget)
         self.ui.set_transfer_widget(self.transfer_widget)
         self.transfer_manager.set_transfer_widget(self.transfer_widget)
-            
+                
     def start(self):
         # Show ui
         self.ui.show()
@@ -58,6 +64,8 @@ class DropN900(QtCore.QObject):
         self.connected = False
         # Start by checking existing auth
         self.check_for_auth(self.datahandler.configpath("token.ini"))
+        # Exec QApplication
+        os._exit(self.exec_())
                 
     def check_for_auth(self, filename):
         token_config = SafeConfigParser()
@@ -116,19 +124,9 @@ class DropN900(QtCore.QObject):
     def get_config(self):
         return auth.Authenticator.load_config(self.datahandler.datapath(".config"))
 
+""" This is the main function that starts the program when this file is executed """
 
-""" This is the main function that starts the program
-
-    * Set debug if you want to get stdout prints from python
-      this is meant for scratchbox so you dont have to constantly look at console widget
-    * Set maemo_env if you are running in the device
-      other wise set to False when running in scratchbox"""
-      
 if __name__ == "__main__":
-    app = QtGui.QApplication(sys.argv)
-    debug = True
-    maemo_env = True
-    dropn900 = DropN900(debug, maemo_env)
-    dropn900.start()
-    os._exit(app.exec_())
+    application = DropN900()
+    application.start()
 

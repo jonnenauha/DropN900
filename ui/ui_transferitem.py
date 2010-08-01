@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'transferitem.ui'
 #
-# Created: Sun Aug  1 07:08:42 2010
+# Created: Sun Aug  1 23:22:31 2010
 #      by: PyQt4 UI code generator 4.6
 #
 # WARNING! All changes made in this file will be lost!
@@ -12,7 +12,7 @@ from PyQt4 import QtCore, QtGui
 class Ui_TransferItem(object):
     def setupUi(self, TransferItem):
         TransferItem.setObjectName("TransferItem")
-        TransferItem.resize(448, 99)
+        TransferItem.resize(465, 99)
         self.horizontalLayout_2 = QtGui.QHBoxLayout(TransferItem)
         self.horizontalLayout_2.setSpacing(0)
         self.horizontalLayout_2.setMargin(0)
@@ -57,11 +57,14 @@ class Ui_TransferItem(object):
         self.mime_icon.setObjectName("mime_icon")
         self.horizontalLayout.addWidget(self.mime_icon)
         self.label_filename = QtGui.QLabel(self.content_frame)
+        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Preferred)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.label_filename.sizePolicy().hasHeightForWidth())
+        self.label_filename.setSizePolicy(sizePolicy)
         self.label_filename.setIndent(7)
         self.label_filename.setObjectName("label_filename")
         self.horizontalLayout.addWidget(self.label_filename)
-        spacerItem = QtGui.QSpacerItem(1, 1, QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
-        self.horizontalLayout.addItem(spacerItem)
         self.label_status = QtGui.QLabel(self.content_frame)
         self.label_status.setObjectName("label_status")
         self.horizontalLayout.addWidget(self.label_status)
@@ -82,11 +85,10 @@ class Ui_TransferItem(object):
         font.setItalic(False)
         font.setBold(False)
         self.title_from.setFont(font)
-        self.title_from.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.title_from.setObjectName("title_from")
         self.from_layout.addWidget(self.title_from)
         self.label_from = QtGui.QLabel(self.content_frame)
-        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Preferred)
+        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.label_from.sizePolicy().hasHeightForWidth())
@@ -94,11 +96,10 @@ class Ui_TransferItem(object):
         font = QtGui.QFont()
         font.setPointSize(13)
         self.label_from.setFont(font)
+        self.label_from.setWordWrap(True)
         self.label_from.setIndent(5)
         self.label_from.setObjectName("label_from")
         self.from_layout.addWidget(self.label_from)
-        spacerItem1 = QtGui.QSpacerItem(1, 1, QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
-        self.from_layout.addItem(spacerItem1)
         self.label_duration = QtGui.QLabel(self.content_frame)
         sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(0)
@@ -144,7 +145,7 @@ class Ui_TransferItem(object):
         self.title_to.setObjectName("title_to")
         self.horizontalLayout_4.addWidget(self.title_to)
         self.label_to = QtGui.QLabel(self.content_frame)
-        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Preferred)
+        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.label_to.sizePolicy().hasHeightForWidth())
@@ -152,11 +153,10 @@ class Ui_TransferItem(object):
         font = QtGui.QFont()
         font.setPointSize(13)
         self.label_to.setFont(font)
+        self.label_to.setWordWrap(True)
         self.label_to.setIndent(5)
         self.label_to.setObjectName("label_to")
         self.horizontalLayout_4.addWidget(self.label_to)
-        spacerItem2 = QtGui.QSpacerItem(40, 20, QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
-        self.horizontalLayout_4.addItem(spacerItem2)
         self.label_timestamp = QtGui.QLabel(self.content_frame)
         sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(0)

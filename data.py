@@ -59,15 +59,7 @@ class DataParser:
                 self.tree_controller.set_root_folder(folder)
             else:
                 self.tree_controller.update_folder(folder.path, folder)
-
             tree_item = folder
-
-##            # Expand previously opened folders
-##            if opened_folders != None:
-##                for child_folder in folder.get_folders():
-##                    if opened_folders.has_key(child_folder.get_name()):
-##                        if child_folder.path == opened_folders[child_folder.get_name()]:
-##                            self.controller.connection.get_metadata(child_folder.path, child_folder.root)
 
         return tree_item
 
@@ -122,24 +114,19 @@ class DataParser:
 
 class MaemoDataHandler:
 
-    def __init__(self, controller, maemo, logger):
+    def __init__(self, controller, logger):
         self.controller = controller
-        self.maemo = maemo
         self.logger = logger
         self.store_auth_to_file = True
         self.dont_show_dl_dialog = False
         self.only_sync_on_wlan = True
-        if self.maemo:
-            self.user_home = str(QDir.home().absolutePath())
-            self.app_root = "/opt/dropn900/"
-            self.config_root = self.user_home + "/.dropn900/"
-            self.data_root = self.user_home + "/MyDocs/DropN900/"
-            self.default_data_root = self.user_home + "/MyDocs/DropN900"
-        else:
-            self.app_root = ""
-            self.config_root = ""
-            self.data_root = ""
-            self.default_data_root = ""
+
+        self.user_home = str(QDir.home().absolutePath())
+        self.app_root = "/opt/dropn900/"
+        self.config_root = self.user_home + "/.dropn900/"
+        self.data_root = self.user_home + "/MyDocs/DropN900/"
+        self.default_data_root = self.user_home + "/MyDocs/DropN900"
+
         self.startup_checks()
 
     def datapath(self, datafile):
@@ -159,8 +146,6 @@ class MaemoDataHandler:
         self.check_for_config_folder()
 
     def check_for_data_folder(self):
-        if not self.maemo:
-            return
         if self.data_root == (self.user_home + "/MyDocs/DropN900/"):
             data_dir = QDir.home()
             if data_dir.cd("MyDocs"):
@@ -181,8 +166,6 @@ class MaemoDataHandler:
                 self.check_for_data_folder()
 
     def check_for_config_folder(self):
-        if not self.maemo:
-            return
         config_dir = QDir.home()
         if not config_dir.cd(".dropn900"):
             if config_dir.mkdir(".dropn900"):

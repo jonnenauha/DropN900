@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>448</width>
+    <width>465</width>
     <height>99</height>
    </rect>
   </property>
@@ -144,6 +144,12 @@ QLabel#label_timestamp, #label_status, #label_duration, #label_size {
             </item>
             <item>
              <widget class="QLabel" name="label_filename">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
               <property name="styleSheet">
                <string>margin-bottom: 3px;</string>
               </property>
@@ -154,19 +160,6 @@ QLabel#label_timestamp, #label_status, #label_duration, #label_size {
                <number>7</number>
               </property>
              </widget>
-            </item>
-            <item>
-             <spacer name="horizontalSpacer_2">
-              <property name="orientation">
-               <enum>Qt::Horizontal</enum>
-              </property>
-              <property name="sizeHint" stdset="0">
-               <size>
-                <width>1</width>
-                <height>1</height>
-               </size>
-              </property>
-             </spacer>
             </item>
             <item>
              <widget class="QLabel" name="label_status">
@@ -210,15 +203,12 @@ QLabel#label_timestamp, #label_status, #label_duration, #label_size {
               <property name="text">
                <string>from</string>
               </property>
-              <property name="alignment">
-               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-              </property>
              </widget>
             </item>
             <item>
              <widget class="QLabel" name="label_from">
               <property name="sizePolicy">
-               <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
+               <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
                 <horstretch>0</horstretch>
                 <verstretch>0</verstretch>
                </sizepolicy>
@@ -231,23 +221,13 @@ QLabel#label_timestamp, #label_status, #label_duration, #label_size {
               <property name="text">
                <string>path</string>
               </property>
+              <property name="wordWrap">
+               <bool>true</bool>
+              </property>
               <property name="indent">
                <number>5</number>
               </property>
              </widget>
-            </item>
-            <item>
-             <spacer name="horizontalSpacer">
-              <property name="orientation">
-               <enum>Qt::Horizontal</enum>
-              </property>
-              <property name="sizeHint" stdset="0">
-               <size>
-                <width>1</width>
-                <height>1</height>
-               </size>
-              </property>
-             </spacer>
             </item>
             <item>
              <widget class="QLabel" name="label_duration">
@@ -334,7 +314,7 @@ QLabel#label_timestamp, #label_status, #label_duration, #label_size {
             <item>
              <widget class="QLabel" name="label_to">
               <property name="sizePolicy">
-               <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
+               <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
                 <horstretch>0</horstretch>
                 <verstretch>0</verstretch>
                </sizepolicy>
@@ -347,23 +327,13 @@ QLabel#label_timestamp, #label_status, #label_duration, #label_size {
               <property name="text">
                <string>path</string>
               </property>
+              <property name="wordWrap">
+               <bool>true</bool>
+              </property>
               <property name="indent">
                <number>5</number>
               </property>
              </widget>
-            </item>
-            <item>
-             <spacer name="horizontalSpacer_3">
-              <property name="orientation">
-               <enum>Qt::Horizontal</enum>
-              </property>
-              <property name="sizeHint" stdset="0">
-               <size>
-                <width>40</width>
-                <height>20</height>
-               </size>
-              </property>
-             </spacer>
             </item>
             <item>
              <widget class="QLabel" name="label_timestamp">
