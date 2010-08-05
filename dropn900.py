@@ -29,7 +29,7 @@ class DropN900(QApplication):
         
         # Logger
         self.logger = Logger(debug)
-        
+
         # Setup data handler and config helper
         self.datahandler = MaemoDataHandler(self, self.logger)
         self.config_helper = ConfigHelper(self.datahandler, self.logger)
@@ -69,6 +69,8 @@ class DropN900(QApplication):
                 
     def check_for_auth(self, filename):
         token_config = SafeConfigParser()
+        if isinstance(filename, unicode):
+            filename = filename.encode("utf-8")
         token_config.read(filename)
         try:
             access_key = token_config.get("token", "key")

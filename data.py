@@ -7,6 +7,7 @@ from PyQt4.QtCore import QDir, QString
 
 from ConfigParser import ConfigParser, SafeConfigParser, NoSectionError
 
+        
 """ DataParser gets data from network layer, converts
     to app format and sends onwards to ui layer """
 
@@ -121,23 +122,25 @@ class MaemoDataHandler:
         self.dont_show_dl_dialog = False
         self.only_sync_on_wlan = True
 
-        self.user_home = str(QDir.home().absolutePath())
-        self.app_root = "/opt/dropn900/"
-        self.config_root = self.user_home + "/.dropn900/"
-        self.data_root = self.user_home + "/MyDocs/DropN900/"
-        self.default_data_root = self.user_home + "/MyDocs/DropN900"
-
+        self.user_home = self.to_unicode(str(QDir.home().absolutePath().toUtf8()))
+        self.app_root = self.to_unicode("/opt/dropn900/")
+        self.config_root = self.user_home + self.to_unicode("/.dropn900/")
+        self.data_root = self.user_home + self.to_unicode("/MyDocs/DropN900/")
+        self.default_data_root = self.user_home + self.to_unicode("/MyDocs/DropN900")
         self.startup_checks()
 
     def datapath(self, datafile):
-        return self.app_root + datafile
+        return self.app_root + self.to_unicode(datafile)
         
     def configpath(self, configfile):
-        return self.config_root + configfile
+        return self.config_root + self.to_unicode(configfile)
         
     def datadirpath(self, datafile):
-        return self.data_root + datafile
+        return self.data_root + self.to_unicode(datafile)
     
+    def set_data_dir_path(self, path):
+        self.data_root = self.to_unicode(path)
+        
     def get_data_dir_path(self):
         return self.data_root
         
@@ -180,7 +183,8 @@ class MaemoDataHandler:
             token_config.set("token", "secret", access_token.secret)
             token_config.set("token", "key", access_token.key)
             try:
-                config_file = open(self.configpath("token.ini"), "w")
+                unicode_file_path = self.configpath("token.ini")
+                config_file = open(unicode_file_path.encode("utf-8"), "w")
                 token_config.write(config_file)
                 config_file.close()
                 self.logger.auth("Stored received access token")
@@ -219,17 +223,22 @@ class MaemoDataHandler:
                 break
         return '%.*f %s' % (precision, bytes / factor, suffix)
 
+    def to_unicode(self, obj, encoding = "utf-8"):
+        if isinstance(obj, basestring):
+            if not isinstance(obj, unicode):
+                obj = unicode(obj, encoding)
+        return obj
 
 """ Parent class for all data items """
 
 class Item:
 
     def __init__(self, path, root, modified, icon, has_thumb):
-        self.path = path
-        self.root = root
+        self.path = self.to_unicode(path)
+        self.root = self.to_unicode(root)
         self.format_modified(modified)
-        self.icon = icon
-        self.has_thumb = has_thumb
+        self.icon = self.to_unicode(icon)
+        self.has_thumb = self.to_unicode(has_thumb)
         
         self.tree_item = None
         self.load_widget = None
@@ -291,6 +300,7 @@ class Item:
             
         # Form final timestamp
         self.modified = day + "." + month + "." + year + " " + time
+        self.modified = self.to_unicode(self.modified)
         
     def get_modified(self):
         return self.modified
@@ -318,10 +328,17 @@ class Item:
         for string in self.path.split("/")[0:-1]:
             self.parent += string + "/"
         self.parent = self.parent[0:-1]
+        self.parent = self.to_unicode(self.parent)
 
     def refresh_name_data(self, path):
-        self.path = path
+        self.path = self.to_unicode(path)
         self.set_name()
+        
+    def to_unicode(self, obj, encoding = "utf-8"):
+        if isinstance(obj, basestring):
+            if not isinstance(obj, unicode):
+                obj = unicode(obj, encoding)
+        return obj
         
 """ Collection aka folder data class """
 
@@ -332,20 +349,20 @@ class Collection(Item):
         Item.__init__(self, path, root, modified, icon, has_thumb)
 
         # Init Collection params
-        self.hash = hashcode
+        self.hash = self.to_unicode(hashcode)
         self.items = []
-        self.mime_type = "folder"
+        self.mime_type = self.to_unicode("folder")
         
         self.set_name()
 
     def set_name(self):
         if self.path != "":
-            self.name = self.path.split("/")[-1]
+            self.name = self.to_unicode(self.path.split("/")[-1])
         else:
             if self.root == "sandbox":
-                self.name = "DropN900"
+                self.name = self.to_unicode("DropN900")
             else:
-                self.name = "DropBox"
+                self.name = self.to_unicode("DropBox")
 
     def add_item(self, item):
         self.items.append(item)
@@ -377,13 +394,16 @@ class Collection(Item):
         return True
 
     # For debug prints
-    def __str__(self):
-        print self.name
-        print "  Path       : ", self.path
-        print "  Name       : ", self.name
-        print "  Root       : ", self.root
+    def __str__(self, encoding = "utf-8"):
+        print self.name.encode(encoding)
+        print "  Path       : ", self.path.encode(encoding)
+        print "  Name       : ", self.name.encode(encoding)
+        print "  Root       : ", self.root.encode(encoding)
         print "  Item count : ", self.item_count()
-        print "  Hashcode   : ", self.hash
+        if self.hash:
+            print "  Hashcode   : ", self.hash.encode(encoding)
+        else:
+            print "  Hashcode   : ", self.hash
         print "  TREE item  : ", self.tree_item
         return ""
 
@@ -397,15 +417,15 @@ class Resource(Item):
         Item.__init__(self, path, root, modified, icon, has_thumb)
 
         # Init Resource params
-        self.size = size
+        self.size = self.to_unicode(size)
         self.size_bytes = size_bytes
-        self.mime_type = mime_type
+        self.mime_type = self.to_unicode(mime_type)
         
         self.set_name()
         self.format_size()
 
     def set_name(self):
-        self.name = self.path.split("/")[-1]
+        self.name = self.to_unicode(self.path.split("/")[-1])
         
     def format_size(self):
         i = self.size.find("MB")
@@ -421,18 +441,18 @@ class Resource(Item):
     def generate_public_link(self, uid):
         if uid != None:
             public_path = self.path[len("/Public"):]
-            self.public_link = "http://dl.dropbox.com/u/" + uid + public_path
+            self.public_link = self.to_unicode("http://dl.dropbox.com/u/" + uid + public_path)
         else:
             self.public_link = None
     
     # For debug prints
-    def __str__(self):
-        print self.name
-        print "  Root : ", self.root
-        print "  Path : ", self.name
-        print "  Size : ", self.size
-        print "  Mod  : ", self.modified
-        print "  Mime : ", self.mime_type
+    def __str__(self, encoding = "utf-8"):
+        print self.name.encode(encoding)
+        print "  Root : ", self.root.encode(encoding)
+        print "  Path : ", self.name.encode(encoding)
+        print "  Size : ", self.size.encode(encoding)
+        print "  Mod  : ", self.modified.encode(encoding)
+        print "  Mime : ", self.mime_type.encode(encoding)
         print "  TREE item : ", self.tree_item
         return ""
 

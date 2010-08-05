@@ -4,6 +4,7 @@ import time
 import simplejson
 import mimetypes
 
+from httplib import socket
 from collections import deque
 
 from PyQt4.QtGui import QMainWindow, QWidget, QMessageBox, QIcon, QPixmap, QMovie, QLabel, QScrollArea
@@ -484,8 +485,15 @@ class TransferManager(QObject):
                 self.logger.transfer_error(transfer.transfer_type + " of " + transfer.file_name + " failed, no connection?")
                 self.logger.transfer_error(">>" + str(transfer.error))
             if transfer.response != None:
-                transfer_widget.set_completed()
-                transfer.callback(transfer.response, transfer.data, transfer.callback_parameters)
+                if transfer.response.status == 200:
+                    transfer_widget.set_completed()
+                else:
+                    transfer_widget.set_failed("Failed with reason: " + transfer.response.body)
+                    return
+                if transfer.transfer_type == "Download":
+                    transfer.callback(transfer.response, transfer.data, transfer.callback_parameters)
+                else:
+                    transfer.callback(transfer.response, transfer.callback_parameters)
             del transfer
             self.check_transfer_queue()
 
@@ -552,10 +560,18 @@ class TransferWorker(NetworkWorker):
         self.store_path = dropbox_store_path
 
     def run(self):
+        encoded_params = []
+        for param in self.parameters:
+            param = self.encode_unicode(param)
+            encoded_params.append(param)
+
         try:
-            self.response = self.method(*self.parameters)
+            self.response = self.method(*tuple(encoded_params))
             if self.response != None:
-                self.data = self.response.read()
+                if self.transfer_type == "Download":
+                    self.data = self.response.read()
+                else:
+                    self.data = self.response.data
             else:
                 self.error = "Response None, with status code " + self.response.status
                 self.data = None
@@ -738,7 +754,7 @@ class TransferItem(QWidget):
         else:
             self.ui.mime_icon.hide()
             self.ui.label_filename.setIndent(0)
-                 
+
     def set_information(self, filename, from_path, to_path, size):
         self.ui.label_filename.setText(filename)
         self.ui.label_from.setText(from_path)        
@@ -818,8 +834,8 @@ class TransferItem(QWidget):
     def set_completed(self, status = None, color = "rgb(94,189,0);"):
         if status == None:
             status = self.transfer_type + " completed"
-        if self.sync_transfer:
-            status = "Sync " + status.lower()
+            if self.sync_transfer:
+                status = "Sync " + status.lower()
         self.set_status(status, color)       
         self.stop_animation()
         self.set_icon(self.initial_pixmap)
@@ -829,8 +845,8 @@ class TransferItem(QWidget):
     def set_failed(self, status = None, color = "rgb(200,0,0);"):
         if status == None:
             status = self.transfer_type + " failed"
-        if self.sync_transfer:
-            status = "Sync " + status.lower()
+            if self.sync_transfer:
+                status = "Sync " + status.lower()
         self.set_status(status, color)
         self.stop_animation()
         self.set_icon(self.parent.icon_error)

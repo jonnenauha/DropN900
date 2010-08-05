@@ -1,4 +1,12 @@
-dropn900-0.1.3-1
+dropn900-0.1.4-1 - 05.08.2010
+* Bug fix: Upload goes through, but fails on internal callback after thread finishes. This resulted in not fetching the new metadata automatically for parent folder after upload.
+* App now uses unicode internally and for networking encodes to utf-8.
+* -> Scandic letter öäå now work and have been tested, any chars in utf-8 should work also of course.
+* -> Tested files/paths with öäå: rename, new folder, download, remove, but on upload with scandics in file name dropbox refuses with "forbidden" response. 
+* -> Errors on upload should show in transfers widget, and the transfer is set to failed state.
+* -> Login email/password can now have non-ascii chars also.
+
+dropn900-0.1.3-1 - 02.08.2010
 * Bug fix: QTimers were not polling active threads due to qmainloopcontext.iteration() was blocking it.
 * Bug fix: Download code was saying too early that file was ready, even 30mb files seemed to come in ~few seconds. This lead multiple downloads to be going at the same time, now only one at a time as intended from the beginning.
 * New Feature: Recursive sync. Searches all subfolders for out of date or missing files and syncs them also
@@ -6,10 +14,10 @@ dropn900-0.1.3-1
 * UI updates to transfer widget to show total sync stats
 * When you sync for example /Photos, it now goes to <default_dl_dir>/Photos
 
-dropn900-0.1.2-2
+dropn900-0.1.2-2 - 30.07.2010
 * Fixed fatal bug: app crashed and burned on start up for users that did not have /home/user/.dropn900 config dir.
 
-dropn900-0.1.2-1
+dropn900-0.1.2-1 - 30.07.2010
 User interface
 * New: Tranfers widget that shows download/uplaod/sync progress and history
 * New: Settings UI where all DropN900 settings can be tweaked by the user. Stored to a config.

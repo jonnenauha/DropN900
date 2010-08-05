@@ -113,10 +113,7 @@ QLabel#label_timestamp, #label_status, #label_duration, #label_size {
            <number>0</number>
           </property>
           <item>
-           <layout class="QHBoxLayout" name="horizontalLayout">
-            <property name="leftMargin">
-             <number>5</number>
-            </property>
+           <layout class="QHBoxLayout" name="top_layout">
             <item>
              <widget class="QLabel" name="mime_icon">
               <property name="sizePolicy">

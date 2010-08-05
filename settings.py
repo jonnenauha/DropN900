@@ -18,7 +18,7 @@ class ConfigHelper:
     def __init__(self, datahandler, logger):
         self.datahandler = datahandler 
         self.logger = logger
-        self.settings_config_filename = self.datahandler.configpath("settings.ini")
+        self.settings_config_filename = self.datahandler.configpath("settings.ini").encode("utf-8")
         self.current_settings = None
         self.read_settings(self.settings_config_filename)
 
@@ -32,9 +32,9 @@ class ConfigHelper:
         
         # Default download folder
         if download_data["default-folder"][-1] != "/":
-            self.datahandler.data_root = download_data["default-folder"] + "/"
+            self.datahandler.set_data_dir_path(download_data["default-folder"] + "/")
         else:
-            self.datahandler.data_root = download_data["default-folder"]
+            self.datahandler.set_data_dir_path(download_data["default-folder"])
             
         # Show download dialog
         self.datahandler.dont_show_dl_dialog = download_data["no-dialog"]
@@ -74,10 +74,11 @@ class ConfigHelper:
             self.set_current_settings(download_data, authentication_data, automate_sync_data)            
         except NoSectionError:
             self.write_default_settings()
+        except NoOptionError, e:
+            print "DropN900 config is missing a settings:", e
         except ValueError:
             self.write_default_settings()
-        except NoOptionError, e:
-            print "NoOptionError:", e
+
         
     def write_default_settings(self, force_dl_folder = False):
         download_data = {}

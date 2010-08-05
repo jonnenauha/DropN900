@@ -270,8 +270,8 @@ class UiController:
         if error == None:
             self.show_banner("Authenticating...", 3000)
             self.set_trusted_login_info("Authenticating, please wait...")
-            self.truested_email = str(email)
-            self.trusted_password = str(password)
+            self.truested_email = self.datahandler.to_unicode(str(email.toUtf8()))
+            self.trusted_password = self.datahandler.to_unicode(str(password.toUtf8()))
             QTimer.singleShot(100, self.do_trusted_login_networking)
         else:
             self.set_trusted_login_error(error)
@@ -279,13 +279,15 @@ class UiController:
     def set_trusted_login_error(self, error):
         self.trusted_login_ui.label_error.setStyleSheet("color: #9d1414;")
         self.trusted_login_ui.label_error.setText(error)
+        self.truested_email = None
+        self.trusted_password = None
         
     def set_trusted_login_info(self, info):
         self.trusted_login_ui.label_error.setStyleSheet("color: #149d2b;")
         self.trusted_login_ui.label_error.setText(info)
         
     def do_trusted_login_networking(self):
-        self.controller.end_trusted_auth(self.truested_email, self.trusted_password)
+        self.controller.end_trusted_auth(self.truested_email.encode("utf-8"), self.trusted_password.encode("utf-8"))
         self.truested_email = None
         self.trusted_password = None
         
@@ -405,15 +407,16 @@ class UiController:
             local_folder_path = QFileDialog.getExistingDirectory(self.manager_widget, QString("Select Download Folder"), QString(self.last_dl_location), QFileDialog.ShowDirsOnly|QFileDialog.HideNameFilterDetails|QFileDialog.ReadOnly)
             if local_folder_path.isEmpty():
                 return
-            self.last_dl_location = str(local_folder_path)
-            store_path = local_folder_path + "/" + data.name
+            py_unicode_path = self.datahandler.to_unicode(str(local_folder_path.toUtf8()))
+            self.last_dl_location = py_unicode_path
+            store_path = py_unicode_path + "/" + data.name
         else:
             dir_check = QDir(self.datahandler.get_data_dir_path())
             if not dir_check.exists():
                 self.show_note("Cannot download, destination " + self.datahandler.get_data_dir_path() + " does not exist. Please set a new folder in settings.")
                 return
             store_path = self.datahandler.get_data_dir_path() + data.name
-        self.controller.connection.get_file(data.path, data.root, str(store_path), data.get_size(), data.mime_type)
+        self.controller.connection.get_file(data.path, data.root, store_path, data.get_size(), data.mime_type)
         
     def item_upload(self):
         data = self.get_selected_data()
@@ -427,9 +430,9 @@ class UiController:
         local_file_path = QFileDialog.getOpenFileName(self.manager_widget, QString("Select File for Upload"), QString(self.last_ul_location))
         if local_file_path.isEmpty():
             return
-        parse_path = str(local_file_path)
-        self.last_ul_location = parse_path[0:parse_path.rfind("/")]
-        self.controller.connection.upload_file(data.path, data.root, str(local_file_path))
+        py_unicode_path = self.datahandler.to_unicode(str(local_file_path.toUtf8()))
+        self.last_ul_location = py_unicode_path[0:py_unicode_path.rfind("/")]
+        self.controller.connection.upload_file(data.path, data.root, py_unicode_path)
         
     def item_rename(self):
         data = self.get_selected_data()
@@ -442,11 +445,12 @@ class UiController:
         new_name, ok = QInputDialog.getText(None, "Renaming " + keyword, "Give new name for " + keyword + " " + old_name, QtGui.QLineEdit.Normal, old_name)
         if not ok:
             return
-
-        # Validations
+        # Validate with QString
         if not self.is_name_valid(new_name, keyword):
             return
-        if old_name == str(new_name):
+        # Make QString to python 'unicode'
+        new_name = self.datahandler.to_unicode(str(new_name.toUtf8()))
+        if old_name == new_name:
             return
 
         # Extension will be lost, ask user if he wants to leave it
@@ -460,10 +464,10 @@ class UiController:
 
         # Get final new path and rename
         if data.parent == "/":
-            new_name = data.parent + str(new_name)
+            new_name = data.parent + new_name
         else:
-            new_name = data.parent + "/" + str(new_name)
-        self.controller.connection.rename(data.root, data.path, str(new_name), data)
+            new_name = data.parent + "/" + new_name
+        self.controller.connection.rename(data.root, data.path, new_name, data)
 
     def item_remove(self):
         data = self.get_selected_data()
@@ -487,10 +491,13 @@ class UiController:
         new_folder_name, ok = QInputDialog.getText(None, "Give new folder name", "")
         if not ok:
             return
+        # Validate QString
         if not self.is_name_valid(new_folder_name, "folder"):
             return
-        full_create_path = data.path + "/" + str(new_folder_name)
-        self.controller.connection.create_folder(data.root, full_create_path, str(new_folder_name), data.path)
+        # Make QString to python unicode
+        new_folder_name = self.datahandler.to_unicode(str(new_folder_name.toUtf8()))
+        full_create_path = data.path + "/" + new_folder_name
+        self.controller.connection.create_folder(data.root, full_create_path, new_folder_name, data.path)
 
     def is_name_valid(self, name, item_type):
         if name.isEmpty() or name.isNull():
@@ -653,18 +660,18 @@ class TreeController:
         
     def parse_tree_item(self, tree_item):
         item_path = []
-        item_path.append(str(tree_item.text(0)))
-        item_name = str(tree_item.text(0))
+        item_name = self.datahandler.to_unicode(str(tree_item.text(0).toUtf8()))
+        item_path.append(item_name)
         if tree_item.parent() != None:
             current_item = tree_item
             while current_item.parent() != None:
                 current_item = current_item.parent()
-                item_path.append(str(current_item.text(0)))
+                item_path.append(self.datahandler.to_unicode(str(current_item.text(0).toUtf8())))
             item_path.pop() # remove root item name from path
         path_str = ""
         for i in range(len(item_path)):
             path_str += "/" + item_path.pop()
-        return item_name, path_str
+        return item_name, self.datahandler.to_unicode(path_str)
         
     def get_data_for_name(self, folder, item_name, item_path):
         for item in folder.get_items():
@@ -827,7 +834,8 @@ class TreeController:
             data = self.clicked_items[item]
         else:
             data = self.get_data_for_item(item)
-            self.clicked_items[item] = data
+            if data != None:
+                self.clicked_items[item] = data
             
         # Be sure that something was returned
         if data == None:

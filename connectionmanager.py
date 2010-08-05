@@ -293,9 +293,9 @@ class ConnectionManager(QObject):
  
         # Get info for ui
         if root == "sandbox":
-            root_name = "DropN900"
+            root_name = unicode("DropN900", "utf-8")
         elif root == "dropbox":
-            root_name = "DropBox"
+            root_name = unicode("DropBox", "utf-8")
         else:
             self.logger.error("Upload file path/root parse error! Cannot continue.")
             return
@@ -304,7 +304,7 @@ class ConnectionManager(QObject):
 
         # Open file for lib
         try:
-            file_obj = open(local_file_path, "rb")
+            file_obj = open(local_file_path.encode("utf-8"), "rb")
         except IOError:
             self.logger.error("Could not open " + local_file_path + " file. Aborting upload.")
             self.show_information("Could not open " + local_file_path + " file for uploading", False)
@@ -321,7 +321,7 @@ class ConnectionManager(QObject):
             if resp.status == 200:
                 self.get_automated_metadata(store_path, root)
             else:
-                self.logger.network_error(str(resp.status) + " - Upload of " + params[0] + " to " + store_path + "failed.")
+                self.logger.network_error(str(resp.status) + " - Upload of " + params[0] + " to " + store_path + " failed.")
                 self.logger.network_error(">> Reason:", resp.body)
         else:
             self.logger.error("Upload failed, internal error")
@@ -470,9 +470,20 @@ class NetworkWorker(Thread):
         else:
             self.callback_parameters= None
 
+    def encode_unicode(self, obj, encoding = "utf-8"):
+        if isinstance(obj, basestring):
+            if isinstance(obj, unicode):
+                return obj.encode(encoding)
+        return obj
+    
     def run(self):
+        encoded_params = []
+        for param in self.parameters:
+            param = self.encode_unicode(param)
+            encoded_params.append(param)
+
         try:
-            self.response = self.method(*self.parameters)
+            self.response = self.method(*tuple(encoded_params))
         except (socket.error, socket.gaierror), err:
             self.response = None
             self.error = err
@@ -496,7 +507,7 @@ class DataWorker(Thread):
         if self.action == "store":
             try:
                 if self.data != None:
-                    f = open(self.file_path, "wb")
+                    f = open(self.file_path.encode("utf-8"), "wb")
                     f.write(self.data)
                     f.close()
                 else:

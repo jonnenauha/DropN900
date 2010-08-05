@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'transferitem.ui'
 #
-# Created: Sun Aug  1 23:22:31 2010
+# Created: Wed Aug  4 21:24:34 2010
 #      by: PyQt4 UI code generator 4.6
 #
 # WARNING! All changes made in this file will be lost!
@@ -43,9 +43,8 @@ class Ui_TransferItem(object):
         self.labels_layout = QtGui.QVBoxLayout()
         self.labels_layout.setSpacing(0)
         self.labels_layout.setObjectName("labels_layout")
-        self.horizontalLayout = QtGui.QHBoxLayout()
-        self.horizontalLayout.setContentsMargins(5, -1, -1, -1)
-        self.horizontalLayout.setObjectName("horizontalLayout")
+        self.top_layout = QtGui.QHBoxLayout()
+        self.top_layout.setObjectName("top_layout")
         self.mime_icon = QtGui.QLabel(self.content_frame)
         sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(0)
@@ -55,7 +54,7 @@ class Ui_TransferItem(object):
         self.mime_icon.setMinimumSize(QtCore.QSize(20, 0))
         self.mime_icon.setMaximumSize(QtCore.QSize(20, 16777215))
         self.mime_icon.setObjectName("mime_icon")
-        self.horizontalLayout.addWidget(self.mime_icon)
+        self.top_layout.addWidget(self.mime_icon)
         self.label_filename = QtGui.QLabel(self.content_frame)
         sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(0)
@@ -64,11 +63,11 @@ class Ui_TransferItem(object):
         self.label_filename.setSizePolicy(sizePolicy)
         self.label_filename.setIndent(7)
         self.label_filename.setObjectName("label_filename")
-        self.horizontalLayout.addWidget(self.label_filename)
+        self.top_layout.addWidget(self.label_filename)
         self.label_status = QtGui.QLabel(self.content_frame)
         self.label_status.setObjectName("label_status")
-        self.horizontalLayout.addWidget(self.label_status)
-        self.labels_layout.addLayout(self.horizontalLayout)
+        self.top_layout.addWidget(self.label_status)
+        self.labels_layout.addLayout(self.top_layout)
         self.from_layout = QtGui.QHBoxLayout()
         self.from_layout.setObjectName("from_layout")
         self.title_from = QtGui.QLabel(self.content_frame)
