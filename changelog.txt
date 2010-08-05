@@ -1,8 +1,9 @@
 dropn900-0.1.4-1 - 05.08.2010
+* Bug fix: Certain themes had column width problems, so you could not see the item names without manual resize.
 * Bug fix: Upload goes through, but fails on internal callback after thread finishes. This resulted in not fetching the new metadata automatically for parent folder after upload.
 * App now uses unicode internally and for networking encodes to utf-8.
-* -> Scandic letter öäå now work and have been tested, any chars in utf-8 should work also of course.
-* -> Tested files/paths with öäå: rename, new folder, download, remove, but on upload with scandics in file name dropbox refuses with "forbidden" response. 
+* -> Scandic letter now work and have been tested, any chars in utf-8 should work also of course.
+* -> Tested files/paths with scandic chars: rename, new folder, download, remove, but on upload with scandics in file name dropbox refuses with "forbidden" response. This seems to be the only limitation.
 * -> Errors on upload should show in transfers widget, and the transfer is set to failed state.
 * -> Login email/password can now have non-ascii chars also.
 
