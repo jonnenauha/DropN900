@@ -1,6 +1,7 @@
 
 import os
 import time
+import datetime
 import simplejson
 import mimetypes
 
@@ -8,7 +9,7 @@ from httplib import socket
 from collections import deque
 
 from PyQt4.QtGui import QMainWindow, QWidget, QMessageBox, QIcon, QPixmap, QMovie, QLabel, QScrollArea
-from PyQt4.QtGui import QSpacerItem, QSizePolicy, QHBoxLayout, QVBoxLayout, QGridLayout
+from PyQt4.QtGui import QSpacerItem, QSizePolicy, QHBoxLayout, QVBoxLayout, QGridLayout, QFont
 from PyQt4.QtCore import Qt, QObject, QTimer, QDateTime, QSize, QDir
 
 from data import Collection, Resource
@@ -184,61 +185,170 @@ class SyncManager(QObject):
             
     def finish_sync(self):
         sync_confirmation = QMessageBox(self.ui.main_widget)
-        sync_confirmation.addButton("Continue", QMessageBox.YesRole)
-        sync_confirmation.addButton("Cancel", QMessageBox.NoRole)
-        sync_confirmation.setWindowTitle("Sync Download Confirmation")
+        continue_button = sync_confirmation.addButton("Continue", QMessageBox.YesRole)
+        cancel_button = sync_confirmation.addButton("Cancel", QMessageBox.NoRole)
+        sync_confirmation.setWindowTitle("Synchronization Confirmation")
         
         main_layout = QGridLayout()
-        main_layout.setHorizontalSpacing(30)
+        main_layout.setHorizontalSpacing(15)
+        main_layout.setContentsMargins(0,0,0,0)
+        
+        row = 0
+        hide_dl_items = []
+        hide_ul_items = []
         
         # Titles
-        style = "QLabel { color: #0099FF; font-weight: bold;}"
-        l = QLabel("Path")
+        style = "QLabel { font-size: 16pt; color: #0099FF; font-weight: bold;}"
+        l = QLabel("Downloading")
+        hide_dl_items.append(l)
         l.setStyleSheet(style)
-        main_layout.addWidget(l, 0, 0)
+        main_layout.addWidget(l, row, 0)
         l = QLabel("Files")
+        hide_dl_items.append(l)
         l.setStyleSheet(style)
-        main_layout.addWidget(l, 0, 1)
+        main_layout.addWidget(l, row, 1)
         l = QLabel("Size")
+        hide_dl_items.append(l)
         l.setStyleSheet(style)
-        main_layout.addWidget(l, 0, 2, Qt.AlignRight)
+        main_layout.addWidget(l, row, 2, Qt.AlignRight)
         
         # Information
-        row = 2
         total_files = 0
         total_folders = 0
         total_bytes = 0
+        total_ul_files = 0
+        total_ul_bytes = 0
+
+        # Iterate all results for downloads
         for result in self.sync_total_results:
-            folder_files = result.total_files
+            folder_files = result.total_dl_files
             total_files += folder_files
-            folder_bytes = result.total_bytes
+            folder_bytes = result.total_dl_bytes
             total_bytes += folder_bytes
             if folder_files > 0:
+                row += 1 
                 total_folders += 1
-                layout = QHBoxLayout()
                 main_layout.addWidget(QLabel(result.remote_path), row, 0)
                 main_layout.addWidget(QLabel(str(folder_files)), row, 1)
-                main_layout.addWidget(QLabel(self.datahandler.humanize_bytes(folder_bytes)), row, 2, Qt.AlignRight)
-                row += 1
-
-        # Add total numbers
-        style = "QLabel { color: rgb(200,0,0); }"
+                main_layout.addWidget(QLabel(self.datahandler.humanize_bytes(folder_bytes)), row, 2, Qt.AlignRight)           
+        
+        # Add total download numbers
+        row += 1
+        style = "QLabel { font-size: 14pt; color: rgb(94,189,0); }"
         l = QLabel("Total")
+        hide_dl_items.append(l)
         l.setStyleSheet(style)
-        main_layout.addWidget(l, 1, 0)
+        main_layout.addWidget(l, row, 0)
         l = QLabel(str(total_files))
+        hide_dl_items.append(l)
         l.setStyleSheet(style)
-        main_layout.addWidget(l, 1, 1)
+        main_layout.addWidget(l, row, 1)
         try:
             total_size_string = self.datahandler.humanize_bytes(total_bytes)
         except:
             total_size_string = "unknown"
         l = QLabel(total_size_string)
+        hide_dl_items.append(l)
         l.setStyleSheet(style)
-        main_layout.addWidget(l, 1, 2, Qt.AlignRight)
+        main_layout.addWidget(l, row, 2, Qt.AlignRight)
         
+        # Search for uploads
+        row += 1
+        ul_title_row = row
+        total_ul_files = 0
+        total_ul_bytes = 0
+        create_new_folders = []
+        all_skipped_uploads = []
+        for result in self.sync_total_results:
+            total_ul_bytes += result.total_ul_bytes
+            total_ul_files += result.total_ul_files
+            all_skipped_uploads += result.skipped_uploads
+            # New files to upload
+            for filename in result.new_files_to_upload:
+                row += 1
+                label = QLabel("NEW FILE")
+                fileonly = filename.split("/")[-1]
+                main_layout.addWidget(QLabel(result.remote_path + "/" + fileonly), row, 0)
+                main_layout.addWidget(label, row, 1)
+                main_layout.addWidget(QLabel(self.datahandler.humanize_bytes(os.path.getsize(filename))), row, 2, Qt.AlignRight)
+            # Files to update
+            for filename in result.out_of_date_files_upload:
+                row += 1       
+                label = QLabel("CHANGED FILE")
+                fileonly = filename.split("/")[-1]
+                main_layout.addWidget(QLabel(result.remote_path + "/" + fileonly), row, 0)
+                main_layout.addWidget(label, row, 1)
+                main_layout.addWidget(QLabel(self.datahandler.humanize_bytes(os.path.getsize(filename))), row, 2, Qt.AlignRight)
+            # New folders and files under them to upload
+            for (remote_folder, local_files) in result.new_folders_to_files.iteritems():
+                create_new_folders.append(result.remote_path + "/" + remote_folder)
+                folder_size = 0
+                folder_files = 0
+                for filename in local_files:
+                    folder_size += os.path.getsize(filename)
+                    folder_files += 1
+                total_ul_bytes += folder_size
+                total_ul_files += folder_files
+                row += 1       
+                if folder_files == 0:
+                    continue
+                label = QLabel(str(folder_files))
+                main_layout.addWidget(QLabel(result.remote_path + "/" + remote_folder), row, 0)
+                main_layout.addWidget(label, row, 1)
+                main_layout.addWidget(QLabel(self.datahandler.humanize_bytes(folder_size)), row, 2, Qt.AlignRight)
+                
+        # Add total upload numbers
+        row += 1
+        style = "QLabel { font-size: 14pt; color: rgb(94,189,0); }"
+        l = QLabel("Total")
+        hide_ul_items.append(l)
+        l.setStyleSheet(style)
+        main_layout.addWidget(l, row, 0)
+        l = QLabel(str(total_ul_files))
+        hide_ul_items.append(l)
+        l.setStyleSheet(style)
+        main_layout.addWidget(l, row, 1)
+        try:
+            total_ul_size_string = self.datahandler.humanize_bytes(total_ul_bytes)
+        except:
+            total_ul_size_string = "unknown"
+        l = QLabel(total_ul_size_string)
+        hide_ul_items.append(l)
+        l.setStyleSheet(style)
+        main_layout.addWidget(l, row, 2, Qt.AlignRight)
+                        
+        # Upload titles
+        style = "QLabel { font-size: 16pt; color: #0099FF; font-weight: bold;}"
+        l = QLabel("Uploading")
+        hide_ul_items.append(l)
+        l.setStyleSheet(style)
+        main_layout.addWidget(l, ul_title_row, 0, Qt.AlignBottom)
+        l = QLabel("Files")
+        hide_ul_items.append(l)
+        l.setStyleSheet(style)
+        main_layout.addWidget(l, ul_title_row, 1, Qt.AlignBottom)
+        l = QLabel("Size")
+        hide_ul_items.append(l)
+        l.setStyleSheet(style)
+        main_layout.addWidget(l, ul_title_row, 2, Qt.AlignBottom|Qt.AlignRight)
+        main_layout.setRowMinimumHeight(ul_title_row, 40)
+        
+        # Creating New Folders
+        if len(create_new_folders) > 0:
+            create_new_folders.sort()
+            row += 1
+            style = "QLabel { font-size: 16pt; color: #0099FF; font-weight: bold;}"
+            l = QLabel("Creating New Folders to DropBox")
+            l.setStyleSheet(style)
+            main_layout.addWidget(l, row, 0, Qt.AlignBottom)
+            for remote_path in create_new_folders:
+                row += 1
+                l = QLabel(remote_path)
+                main_layout.addWidget(l, row, 0, Qt.AlignBottom)
+
         # Make a scrollview
         view_widget = QWidget()
+        view_widget.setFont(QFont("Arial", 14))
         view_widget_l = QVBoxLayout()
         view_widget_l.addLayout(main_layout)
         view_widget_l.addSpacerItem(QSpacerItem(1, 1, QSizePolicy.Minimum, QSizePolicy.Expanding))
@@ -246,33 +356,109 @@ class SyncManager(QObject):
         view = QScrollArea()
         view.setWidget(view_widget)
         view.setWidgetResizable(True)
-        view.setMinimumHeight(300)
+        view.setMinimumHeight(360)
+                    
+        # Add nothing to dl/ul report
+        if total_files == 0 and total_ul_files == 0:
+            # Modify controls and title
+            cancel_button.setText("Close")
+            sync_confirmation.setWindowTitle("Synchronization Report")
+            sync_confirmation.removeButton(continue_button)
+            # Add title
+            row += 1
+            style = "QLabel { font-size: 20pt; color: #0099FF; font-weight: bold;}"
+            l = QLabel("Nothing to sync, all files up to date!")
+            l.setStyleSheet(style)
+            main_layout.addWidget(l, row, 0, Qt.AlignBottom)
+            row += 1
+            main_layout.addWidget(QLabel(""), row, 0, Qt.AlignBottom)
+            if len(all_skipped_uploads) == 0:
+                view.setMinimumHeight(150)
+                    
+        # Report skipped paths
+        if len(all_skipped_uploads) > 0:
+            all_skipped_uploads.sort()
+            row += 1
+            style = "QLabel { font-size: 14pt; color: red; font-weight: bold;}"
+            l = QLabel("Skipping uploads: non ASCII chars in path and ~ temp files")
+            l.setStyleSheet(style)
+            main_layout.addWidget(l, row, 0, Qt.AlignBottom)
+            for skipped_path in all_skipped_uploads:
+                row += 1
+                l = QLabel(skipped_path)
+                main_layout.addWidget(l, row, 0, Qt.AlignBottom)
         
+        # Add view and show dialog
+        sync_confirmation.layout().setHorizontalSpacing(0)
+        sync_confirmation.layout().setVerticalSpacing(0)
+        sync_confirmation.layout().setContentsMargins(0,0,10,10)
+        sync_confirmation.layout().addWidget(view, 0, 0)
+
+        # Hide titles if no items
+        if total_files == 0:
+            for label in hide_dl_items:
+                label.hide()
+        if total_ul_files == 0:
+            for label in hide_ul_items:
+                label.hide()
+                                
         # Show confirmation dialog
-        if total_files > 0:
-            sync_confirmation.layout().addWidget(view, 0, 0)
+        if total_files > 0 or total_ul_files > 0:
             confirmation = sync_confirmation.exec_()
+    
+            # Check confirmation
             if confirmation == 1:
+                del sync_confirmation
                 return
             if confirmation == 0:
                 # Update ui and log
                 post_files = " file from " if total_files == 1 else " files from "
                 post_folders = " folder" if total_folders == 1 else " folders"
                 banner_total_size_string = ", total of " + total_size_string if total_size_string != "unknown" else ""
-                message = "Synchronizing " + str(total_files) + post_files + str(total_folders) + post_folders + banner_total_size_string
+                message = "Downloading " + str(total_files) + post_files + str(total_folders) + post_folders + banner_total_size_string
                 self.logger.sync(message)
-                # Request files from network
+                
+                post_ul_files = " file" if total_ul_files == 1 else " files"
+                banner_total_ul_size_string = ", total of " + total_ul_size_string if total_ul_size_string != "unknown" else ""
+                message_ul = "Uploading " + str(total_ul_files) + post_ul_files + banner_total_ul_size_string
+                self.logger.sync(message_ul)
+                
+                # Create new remote dirs
+                if len(create_new_folders) > 0:
+                    create_new_folders.sort() # sort so we create forlder from bottom up
+                    for remote_path in create_new_folders:
+                        if self.connection.create_folder_blocking(remote_path):
+                            self.logger.info("Created remote folder " + remote_path + " succesfully")
+                        else:
+                            self.logger.info("Failed to create remote folder " + remote_path)
+
+                # Check for additional child results, these are present 
+                # if we have totally new folders with new files for upload
+                additional_results = []
+                for sync_result in self.sync_total_results:
+                    if len(sync_result.child_upload_results) > 0:
+                        additional_results += sync_result.child_upload_results
+                self.sync_total_results += additional_results
+
+                # DL/UL files from/to dropbox
                 store_dir = self.datahandler.get_data_dir_path()
                 for sync_result in self.sync_total_results:
+                    # Create directory
                     if sync_result.local_folder_exists == False:
                         sync_result.create_local_path()
+                    # Queue downloads
                     for sync_file in sync_result.out_of_date_files:
                         self.connection.get_file(sync_file.path, sync_file.root, sync_result.local_path + "/" + sync_file.get_name(), sync_file.size, sync_file.mime_type, True)
-                self.controller.transfer_widget.add_sync_widget(self.sync_root.path, store_dir + self.sync_root.name, total_folders, total_files, total_size_string, None, None)
+                    # Queue uploads
+                    for ul_sync_file in sync_result.out_of_date_files_upload:
+                        self.connection.upload_file(sync_result.remote_path, "dropbox", ul_sync_file, True)
+                    for ul_sync_file in sync_result.new_files_to_upload:
+                        self.connection.upload_file(sync_result.remote_path, "dropbox", ul_sync_file, True)
+                self.controller.transfer_widget.add_sync_widget(self.sync_root.path, store_dir + self.sync_root.name, total_folders, total_files, total_size_string, total_ul_files, total_ul_size_string)
                 self.ui.show_transfer_widget()
         else:
-            self.ui.show_banner("Nothing to synchronize, all file up to date")
-            self.logger.sync("Nothing to synchronize, all file up to date")
+            sync_confirmation.exec_()
+        del sync_confirmation
 
 
 """ SyncRoot has data about the main synchronization path """
@@ -282,7 +468,7 @@ class SyncRoot:
     def __init__(self, data):
         self.path = data.path
         self.name = data.name
-        
+
         
 """ SyncResult has data about a path in the synchronization """
 
@@ -290,25 +476,41 @@ class SyncResult:
 
     def __init__(self, datahandler, sync_folder):
         self.datahandler = datahandler
+        self.logger = datahandler.logger
         self.data = sync_folder
-        self.remote_path = sync_folder.path
+        if sync_folder != None:
+            self.remote_path = self.to_unicode(sync_folder.path)
         self.local_path = None
-        self.local_folder_exists = False
-        
+        if sync_folder != None:
+            self.local_folder_exists = False
+        else:
+            self.local_folder_exists = True
+
+        self.child_upload_results = []        
         self.out_of_date_files = []
+        self.out_of_date_files_upload = []
+        self.new_files_to_upload = []
         self.fetch_meatadata_folders = []
+        self.skipped_uploads = []
+        self.new_folders_to_files = {}
         
         self.total_folders = 0
-        self.total_files = 0
-        self.total_bytes = 0 
-        
+        self.total_dl_files = 0
+        self.total_dl_bytes = 0
+        self.total_ul_files = 0
+        self.total_ul_bytes = 0
+
     def __str__(self):
         print "SYNC RESULT"
         print "> Remote path          :", self.remote_path
         print "> Local path           :", self.local_path
-        print "> Create local folder? :", self.local_folder_exists
-        print "> Out of date files    :", str(len(self.out_of_date_files))
         print "> Sub folders          :", str(len(self.fetch_meatadata_folders))
+        print ""
+        print "> Creating new         :", self.new_folders_to_files
+        print "> Downloading          :", str(len(self.out_of_date_files))
+        print "> Uploading"
+        print "  >> Update            :", str(len(self.out_of_date_files_upload))
+        print "  >> New               :", str(len(self.new_files_to_upload))
         return ""
                 
     def check_local_path(self, sync_root):
@@ -319,28 +521,28 @@ class SyncResult:
             self.local_path = sync_root.name + self.local_path
             self.local_path = self.datahandler.datadirpath(self.local_path)
         else:
-            print "[DropN900] Error parsing path in SyncResult.check_local_path()"
+            self.logger.sync_error("Error parsing path in SyncResult.check_local_path()")
             return
        
         if os.path.exists(self.local_path):
             self.local_folder_exists = True
             
     def create_local_path(self):
-        if self.total_files == 0:
+        if self.total_dl_files == 0:
             return
         if not os.path.exists(self.local_path): 
             try:
                 os.makedirs(self.local_path)
                 self.local_folder_exists = True
             except OSError:
-                print "[DropN900] Failed to create folder in SyncResult.check_local_path(): ", self.local_path
+                self.logger.sync_error("Failed to create folder in SyncResult.create_local_path(): " + str(self.local_path))
 
     def check_files_for_changes(self):
         # Mark subfolders                
         for child_folder in self.data.get_folders():
             self.fetch_meatadata_folders.append(child_folder)
-            
-        # Mark out of date files
+
+        # Mark out of date files, comparing device and remote files
         for child_file in self.data.get_files():
             try:
                 if self.local_folder_exists == False:
@@ -349,62 +551,78 @@ class SyncResult:
                     local_file_path = self.local_path + "/" + child_file.get_name()
                     if os.path.exists(local_file_path):
                         device_modified = time.strftime("%d.%m.%Y %H:%M:%S", time.gmtime(os.path.getmtime(local_file_path)))
-                        if self.is_remote_newer(device_modified, child_file.modified):
+                        
+                        # Parse timestamps
+                        device_datetime = self.parse_timestamp(device_modified)
+                        remote_datetime = self.parse_timestamp(child_file.modified)
+                        device_size_bytes = os.path.getsize(local_file_path)
+                        remote_size_bytes = child_file.size_bytes
+                        
+                        if device_datetime == None or remote_datetime == None:
+                            self.logger.warning("Parsing timestamp for " + local_file_path + " failed, skipping sync.")
+                            continue
+                            
+                        # Check for changes
+                        if remote_datetime > device_datetime and device_size_bytes != remote_size_bytes:
                             self.out_of_date_files.append(child_file)
+                        elif device_datetime > remote_datetime and device_size_bytes != remote_size_bytes:
+                            if self.upload_path_check(local_file_path):
+                                self.out_of_date_files_upload.append(local_file_path)
                     else:
                         self.out_of_date_files.append(child_file)
             except OSError, e:
-                print e
+                self.logger.sync_error("OSError was raised while syncing: " + str(e))
+                
+        # Mark new files on the device for upload
+        local_folders = []
+        remote_filenames = []
+        for remote_file in self.data.get_files():
+            remote_filenames.append(remote_file.get_name())
+       
+        try:
+            for filename in os.listdir(self.local_path):
+                full_path = self.local_path + "/" + filename
+                if os.path.isdir(full_path):
+                    local_folders.append(filename)
+                    continue
+                try:
+                    index = remote_filenames.index(filename)
+                except:
+                    if self.upload_path_check(full_path):
+                        self.new_files_to_upload.append(full_path)
+        except OSError, e:
+            pass # Trying to open non existing non-ascii folder, its marked for DL at this point...
+            
+        # Mark new local folders for upload
+        remote_folders = []
+        for metadata in self.fetch_meatadata_folders:
+            remote_folders.append(metadata.get_name())
         
+        for local_folder_name in local_folders:
+            try:
+                index = remote_folders.index(local_folder_name)
+            except:
+                full_new_path = self.local_path + "/" + local_folder_name
+                self.get_all_files(full_new_path)
+
+        # Create child results from self.new_folders_to_files
+        for (subfolder, fileslist) in self.new_folders_to_files.iteritems():
+            child_result = SyncResult(self.datahandler, None)
+            child_result.remote_path = self.to_unicode(self.remote_path + "/" + subfolder)
+            for filepath in fileslist:
+                child_result.new_files_to_upload.append(filepath)
+            self.child_upload_results.append(child_result)
+                    
         # Calculate totals
         self.total_folders = len(self.fetch_meatadata_folders)
-        self.total_files = len(self.out_of_date_files)
+        self.total_dl_files = len(self.out_of_date_files)
         for f in self.out_of_date_files:
-            self.total_bytes += f.size_bytes
-    
-    """ Move along, nothing to see here :) Yeah, its ugly... but works. Remaking with std later. """
-    def is_remote_newer(self, local_modified, remote_modified):
-        ldata = self.parse_timestamp(local_modified)
-        rdata = self.parse_timestamp(remote_modified)
-        
-        k = "year"
-        if rdata[k] > ldata[k]:
-            return True
-        elif rdata[k] == ldata[k]:
-            k = "month"
-        else:
-            return False
-        if rdata[k] > ldata[k]:
-            return True
-        elif rdata[k] == ldata[k]:
-            k = "day"
-        else:
-            return False
-        if rdata[k] > ldata[k]:
-            return True
-        elif rdata[k] == ldata[k]:
-            k = "hour"
-        else:
-            return False
-        if rdata[k] > ldata[k]:
-            return True
-        elif rdata[k] == ldata[k]:
-            k = "min"
-        else:
-            return False
-        if rdata[k] > ldata[k]:
-            return True
-        elif rdata[k] == ldata[k]:
-            k = "sec"
-        else:
-            return False
-        if rdata[k] > ldata[k]:
-            return True
-        elif rdata[k] == ldata[k]:
-            return False
-        else:
-            return False
-        return False
+            self.total_dl_bytes += f.size_bytes
+        self.total_ul_files = len(self.new_files_to_upload) + len(self.out_of_date_files_upload)
+        for f in self.new_files_to_upload:
+            self.total_ul_bytes += os.path.getsize(f)
+        for f in self.out_of_date_files_upload:
+            self.total_ul_bytes += os.path.getsize(f)
             
     def parse_timestamp(self, timestamp):
         main_parts = timestamp.split(" ")
@@ -418,8 +636,46 @@ class SyncResult:
         data["hour"]  = int(time_parts[0])
         data["min"]   = int(time_parts[1])
         data["sec"]   = int(time_parts[2])
-        return data
         
+        try:
+            datetime_data = datetime.datetime(data["year"], data["month"], data["day"], data["hour"], data["min"], data["sec"])
+        except Exception, e:
+            self.logger.sync_error("Exception occurred when parsing timestamp: " + str(e))
+            return None
+        return datetime_data
+        
+    def upload_path_check(self, path):
+        # Test if filename/path is ok for upload, unfortunately non-ascii 
+        # paths are skipped due to dropbox not accepting them
+        try:
+            str(path)
+            if path.endswith("~"):
+                self.logger.warning("Skipping sync upload for temp file: " + path.encode("utf-8"))
+                self.skipped_uploads.append(path)
+                return False
+        except:
+            self.logger.warning("Skipping sync upload for non-ascii path: " + path.encode("utf-8"))
+            self.skipped_uploads.append(path)
+            return False
+        return True
+        
+    def get_all_files(self, search_path):
+        basefolder = search_path.split("/")[-1]
+        for (path, dirs, files) in os.walk(search_path):
+            if path != search_path:
+                subfolder = basefolder + path[len(search_path):]
+            else:
+                subfolder = basefolder
+            self.new_folders_to_files[subfolder] = []
+            for filename in files:
+                if self.upload_path_check(path + "/" + filename):
+                    self.new_folders_to_files[subfolder].append(path + "/" + filename)
+
+    def to_unicode(self, obj, encoding = "utf-8"):
+        if isinstance(obj, basestring):
+            if not isinstance(obj, unicode):
+                obj = unicode(obj, encoding)
+        return obj
         
 """ TransferManager monitors upload/downloads and relays info to TransferWidget """
 
@@ -487,13 +743,15 @@ class TransferManager(QObject):
             if transfer.response != None:
                 if transfer.response.status == 200:
                     transfer_widget.set_completed()
+                    if transfer.transfer_type == "Download":
+                        transfer.callback(transfer.response, transfer.data, transfer.callback_parameters)
+                    else:
+                        transfer.callback(transfer.response, transfer.callback_parameters)
                 else:
-                    transfer_widget.set_failed("Failed with reason: " + transfer.response.body)
-                    return
-                if transfer.transfer_type == "Download":
-                    transfer.callback(transfer.response, transfer.data, transfer.callback_parameters)
-                else:
-                    transfer.callback(transfer.response, transfer.callback_parameters)
+                    try:
+                        transfer_widget.set_failed("Failed with reason: " + transfer.response.data["error"])
+                    except:
+                        transfer_widget.set_failed("Failed with unknown reason")
             del transfer
             self.check_transfer_queue()
 
@@ -523,7 +781,7 @@ class TransferManager(QObject):
         self.queued_transfer_threads.append(download)
         self.check_transfer_queue()
         
-    def handle_upload(self, path, root, file_obj, file_name, from_local_path, dropbox_store_path, local_file_path):
+    def handle_upload(self, path, root, file_obj, file_name, from_local_path, dropbox_store_path, local_file_path, sync_upload):
         upload = TransferWorker("Upload")
         upload.set_callable(self.client.put_file, root, path, file_obj)
         upload.set_callback(self.connection.upload_file_callback, root, path, file_name)
@@ -532,7 +790,7 @@ class TransferManager(QObject):
             size = self.datahandler.humanize_bytes(os.path.getsize(local_file_path))
         except:
             size = ""
-        upload_item = self.transfer_widget.add_upload(file_name, from_local_path, dropbox_store_path, size)
+        upload_item = self.transfer_widget.add_upload(file_name, from_local_path, dropbox_store_path, size, sync_upload)
         self.tranfer_to_widget[upload] = upload_item
         
         self.queued_transfer_threads.append(upload)
@@ -655,9 +913,10 @@ class TransferWidget(QMainWindow):
         self.layout_check()
         return download_item
         
-    def add_upload(self, filename, from_path, to_path, size):
-        upload_item = TransferItem(self, "Upload", False)
-        upload_item.set_icon(self.icon_upload, True)
+    def add_upload(self, filename, from_path, to_path, size, sync_upload):
+        upload_item = TransferItem(self, "Upload", sync_upload)
+        icon = self.icon_upload if not sync_upload else self.icon_upload_sync
+        upload_item.set_icon(icon, True)
         upload_item.set_information(filename, from_path, to_path, size)
         mime_type, encoding = mimetypes.guess_type(filename)
         upload_item.handle_mime_type(mime_type)
@@ -667,10 +926,10 @@ class TransferWidget(QMainWindow):
         self.layout_check()
         return upload_item
         
-    def add_sync_widget(self, sync_path, local_store_path, total_dl_folders, total_dl_files, total_dl_size, total_ul_files = None, total_ul_size = None):
+    def add_sync_widget(self, sync_path, local_store_path, total_dl_folders, total_dl_files, total_dl_size, total_ul_files, total_ul_size):
         sync_information = TransferItem(self, "Synchronization", True)
         sync_information.set_icon(self.icon_sync, True)
-        sync_information.set_sync_information(sync_path, local_store_path, total_dl_folders, total_dl_files, total_dl_size)
+        sync_information.set_sync_information(sync_path, local_store_path, total_dl_folders, total_dl_files, total_dl_size, total_ul_files, total_ul_size)
         
         self.ui.item_layout.insertWidget(0, sync_information)
         sync_information.show()
@@ -765,24 +1024,39 @@ class TransferItem(QWidget):
             self.ui.label_size.hide()
             self.ui.label_sep.hide()
             
-    def set_sync_information(self, sync_path, local_store_path, total_dl_folders, total_dl_files, total_dl_size):
+    def set_sync_information(self, sync_path, local_store_path, total_dl_folders, total_dl_files, total_dl_size, total_ul_files, total_ul_size):
         self.handle_mime_type(None)
         self.set_status(self.transfer_type, "#0099FF;")
         self.generate_timestamp(QDateTime.currentDateTime())
         self.ui.label_filename.setText(sync_path)
-        self.ui.label_size.setText("Total size " + total_dl_size)
-        self.ui.label_duration.hide()
-        self.ui.label_sep.hide()
+        self.ui.label_size.setText("DL " + total_dl_size)
         self.ui.title_from.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         self.ui.title_from.setMaximumWidth(300)
         self.ui.title_from.setText("Downloading")
         self.ui.title_from.setIndent(5)
         self.ui.title_from.setAlignment(Qt.AlignLeft|Qt.AlignVCenter)
+        self.ui.title_to.setMinimumWidth(1)
+        self.ui.title_to.setIndent(5)
         post_files = " file from " if total_dl_files == 1 else " files from "
         post_folders = " folder" if total_dl_folders == 1 else " folders"
         self.ui.label_from.setText(str(total_dl_files) + post_files + str(total_dl_folders) + post_folders)
         self.ui.label_to.setText(local_store_path)
+        self.ui.label_duration.setText("UL " + total_ul_size)
         
+        layout = QHBoxLayout()
+        ul_title = QLabel("Uploading")
+        ul_title.setObjectName("title_upload")
+        post_ul_files = " file" if total_ul_files == 1 else " files"
+        ul_value = QLabel(str(total_ul_files) + post_ul_files)
+        ul_value.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        ul_value.setIndent(5)
+        layout.addWidget(ul_title)
+        layout.addWidget(ul_value)
+        self.ui.labels_layout.addLayout(layout)
+        
+        self.ui.label_duration.show()
+        self.ui.label_sep.show()
+                
     def set_duration(self):
         self.duration_sec += 1
         if self.duration_sec == 60:

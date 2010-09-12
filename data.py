@@ -209,18 +209,19 @@ class MaemoDataHandler:
     """ Code snipped taken from http://code.activestate.com/recipes/577081-humanized-representation-of-a-number-of-bytes/ """
     def humanize_bytes(self, bytes, precision = 1):
         abbrevs = (
-            (1<<50L, 'PB'),
-            (1<<40L, 'TB'),
-            (1<<30L, 'GB'),
-            (1<<20L, 'MB'),
-            (1<<10L, 'KB'),
-            (1, 'bytes')
+            (1<<50L, 'PB'), (1<<40L, 'TB'),
+            (1<<30L, 'GB'), (1<<20L, 'MB'),
+            (1<<10L, 'KB'), (1, 'bytes')
         )
         if bytes == 1:
             return '1 byte'
         for factor, suffix in abbrevs:
             if bytes >= factor:
                 break
+        if factor == 1:
+            factor = 1024
+            suffix = "KB"
+            precision = 2
         return '%.*f %s' % (precision, bytes / factor, suffix)
 
     def to_unicode(self, obj, encoding = "utf-8"):

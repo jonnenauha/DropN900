@@ -3,16 +3,13 @@ import os
 
 from PyQt4 import QtCore, QtGui, QtMaemo5
 from PyQt4.QtMaemo5 import QMaemo5InformationBox
-from PyQt4.QtCore import Qt, QString, QStringList, QTimer, QDir
-from PyQt4.QtGui import QMainWindow, QWidget, QTreeWidgetItem, QDesktopServices
-from PyQt4.QtGui import QImage, QPixmap, QIcon, QImageReader, QMovie
-from PyQt4.QtGui import QInputDialog, QFileDialog, QMessageBox
-from PyQt4.QtNetwork import QNetworkReply, QNetworkRequest
+from PyQt4.QtCore import Qt, QString, QStringList, QTimer, QDir, QSize
+from PyQt4.QtGui import QMainWindow, QWidget, QDialog, QLabel, QTreeWidgetItem, QDesktopServices
+from PyQt4.QtGui import QImage, QPixmap, QIcon, QImageReader, QMovie, QGridLayout, QSizePolicy, QPalette
+from PyQt4.QtGui import QInputDialog, QFileDialog, QMessageBox, QPushButton
 
 from ui.ui_mainwindow import Ui_DropN900Widget
-from ui.ui_loginwidget import Ui_LoginWidget
 from ui.ui_trustedloginwidget import Ui_TrustedLoginWidget
-from ui.ui_browserwidget import Ui_BrowserWidget
 from ui.ui_managerwidget import Ui_ManagerWidget
 from ui.ui_consolewidget import Ui_ConsoleWidget
 from ui.ui_loadingwidget import Ui_LoadingWidget
@@ -60,31 +57,6 @@ class UiController:
         self.action_console.triggered.connect(self.show_console)
         self.action_about.triggered.connect(self.show_about)
         self.action_exit.triggered.connect(self.shut_down)
-
-        ### Browser Widget
-        self.browser_widget = QWidget()
-        self.browser_ui = Ui_BrowserWidget()
-        self.browser_ui.setupUi(self.browser_widget)
-
-        # Connects
-        self.browser_ui.button_done.clicked.connect(self.browser_control_clicked)
-        self.browser_ui.url_line_edit.returnPressed.connect(self.webview_load_url)
-        self.browser_ui.webview.loadStarted.connect(self.webview_load_started)
-        self.browser_ui.webview.loadProgress.connect(self.webview_load_progress)
-        self.browser_ui.webview.loadFinished.connect(self.webview_load_finished)
-        
-        network_manager = self.browser_ui.webview.page().networkAccessManager()
-        network_manager.sslErrors.connect(self.ssl_errors_occurred)
-        network_manager.finished.connect(self.load_reply_received)
-
-        ### Login Widget
-        self.login_widget = QWidget()
-        self.login_ui = Ui_LoginWidget()
-        self.login_ui.setupUi(self.login_widget)
-        self.authurl = None
-
-        # Connects
-        self.login_ui.button_action.clicked.connect(self.login_button_clicked)
         
         ### Trusted Login Widget
         self.trusted_login_widget = QWidget()
@@ -120,7 +92,6 @@ class UiController:
         self.last_ul_location = None
 
         ### Console widget
-        
         self.console_widget = QWidget(self.main_widget, Qt.Window)
         self.console_widget.setAttribute(Qt.WA_Maemo5StackedWindow)
         self.console_ui = Ui_ConsoleWidget()
@@ -132,8 +103,6 @@ class UiController:
         self.settings_widget = None
 
         ### Fill stacked layout
-        self.stacked_layout.addWidget(self.browser_widget)
-        self.stacked_layout.addWidget(self.login_widget)
         self.stacked_layout.addWidget(self.trusted_login_widget)
         self.stacked_layout.addWidget(self.manager_widget)
         self.stacked_layout.setCurrentWidget(self.trusted_login_widget)
@@ -161,6 +130,9 @@ class UiController:
         self.information_icon_ok = QPixmap(self.datahandler.datapath("ui/icons/check.png")).scaled(24,24)
         self.information_icon_error = QPixmap(self.datahandler.datapath("ui/icons/cancel.png")).scaled(24,24)
         self.information_icon_queue = QPixmap(self.datahandler.datapath("ui/icons/queue.png")).scaled(24,24)
+        
+        ### About dialog
+        self.about_dialog = AboutDialog(self)
 
     def set_settings_widget(self, settings_widget):
         self.settings_widget = settings_widget
@@ -189,8 +161,8 @@ class UiController:
         self.transfer_widget.show()
         
     def show_about(self):
-        message = "<span style=\"color:white;\"><span style=\"color:#0099FF;\"><b>Maintainer</b></span> Jonne Nauha - jonne.nauha@evocativi.com<br><span style=\"color:#0099FF;\"><b>Bug Tracker</b></span> http://github.com/jonnenauha/DropN900/issues<br><span style=\"color:#0099FF;\"><b>Icons</b></span> http://openiconlibrary.sourceforge.net</span></span>"
-        QMaemo5InformationBox.information(self.manager_widget, QString(message), 0)
+        if not self.about_dialog.isVisible():
+            self.about_dialog.show()
         
     def show_note(self, message):
         QMaemo5InformationBox.information(None, QString(message), 0)
@@ -238,19 +210,6 @@ class UiController:
         self.loading_ui.info_label_icon.hide()
         self.hide_loading_ui()
         self.manager_ui.thumb_container.setVisible(self.thumb_was_visible)
-
-    def load_login(self, authurl):
-        self.switch_context("login")
-        self.authurl = authurl
-
-    def login_button_clicked(self):
-        if self.authurl != None:
-            if QDesktopServices.openUrl(QtCore.QUrl(self.authurl)):
-                self.authurl = None
-                self.login_ui.label_info.setText("When you have completed the login in the web browser click the button below")
-                self.login_ui.button_action.setText("I'm done authenticating, lets go!")
-        else:
-            self.controller.end_auth()
             
     def try_trusted_login(self):
         self.trusted_login_ui.label_error.setText("")
@@ -298,10 +257,6 @@ class UiController:
 
     def switch_context(self, view = None):
         widget = None
-        if view == "browser":
-            widget = self.browser_widget
-        if view == "login":
-            widget = self.login_widget
         if view == "trustedlogin":
             widget = self.trusted_login_widget
         if view == "manager":
@@ -342,39 +297,6 @@ class UiController:
         except IOError:
             self.logger.error("Could not open " + filename + " to save log")
 
-    # We should not end here in the device as it has ssl libs in place
-    # on windows youll have to have openssl libs in place or login via webauth wont work
-    def ssl_errors_occurred(self, reply, errors):
-        self.logger.network_error("SSL errors while loading", str(reply.url()))
-        
-    def webview_load_url(self, url = None):
-        if url == None:
-            url = QtCore.QUrl(self.browser_ui.url_line_edit.text())
-        else:
-            url = QtCore.QUrl(url)
-        self.browser_ui.webview.load(url)
-
-    def webview_load_started(self):
-        self.browser_ui.webview_status_label.setText("Loading...")
-
-    def webview_load_progress(self, progress):
-        self.browser_ui.webview_status_label.setText("Loading... " + str(progress) + "%")
-        
-    def webview_load_finished(self, succesfull):
-        if succesfull:
-            status = "Page loaded"
-        else:
-            status = "Page load failed"
-        self.browser_ui.webview_status_label.setText(status)
-        self.browser_ui.url_line_edit.setText(self.browser_ui.webview.url().toString())
-
-    def load_reply_received(self, reply):
-        attr_redir = reply.attribute(QNetworkRequest.RedirectionTargetAttribute)
-        if not attr_redir.isNull():
-            self.browser_ui.webview_status_label.setText("Redirecting...")
-        if reply.error() != 0:
-            self.logger.network_error("NETWORK ERROR -", reply.errorString())
-            self.logger.network_error(">> Error code", str(reply.error()))
 
     def browser_control_clicked(self):
         if self.controller.connected:
@@ -517,6 +439,128 @@ class UiController:
         return True
 
 
+""" About Dialog to show information and links to relevant URLs """
+
+class AboutDialog(QDialog):
+
+    def __init__(self, controller):
+        QDialog.__init__(self, controller.main_widget, Qt.Dialog)
+        self.setAttribute(Qt.WA_Maemo5StackedWindow)
+        self.setWindowTitle("About DropN900")
+        
+        grid_layout = QGridLayout()
+        grid_layout.setVerticalSpacing(5)
+        grid_layout.setHorizontalSpacing(25)
+        grid_layout.setContentsMargins(0, 10, 50, 0)
+        self.setLayout(grid_layout)
+
+        icon_label = QLabel(self)
+        icon_label.setMinimumSize(128, 128)
+        icon_label.setMaximumSize(128, 128)
+        icon_label.setPixmap(QPixmap(controller.datahandler.datapath("ui/images/dropn900_logo.png")))
+        icon_label.move(600, 5)
+        
+        topics = []           
+        links = []
+        
+        label = QLabel("Version")
+        topics.append(label)        
+        self.layout().addWidget(label, 0, 0, Qt.AlignRight)
+        
+        label = QLabel("0.1.5")
+        self.layout().addWidget(label, 0, 1)
+                
+        label = QLabel("Made by")
+        topics.append(label)        
+        self.layout().addWidget(label, 1, 0, Qt.AlignRight)
+        
+        label = QLabel("Jonne Nauha")
+        self.layout().addWidget(label, 1, 1)
+
+        label = QLabel("Pforce @ IRCNet & freenode")
+        self.layout().addWidget(label, 2, 1)
+        
+        label = QPushButton("jonne.nauha@evocativi.com")
+        label.clicked.connect(self.email_clicked)
+        label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        links.append(label)
+        self.layout().addWidget(label, 3, 1)
+        
+        label = QLabel("Official Thread")
+        topics.append(label)       
+        self.layout().addWidget(label, 4, 0, Qt.AlignRight)
+        
+        label = QPushButton("http://talk.maemo.org/showthread.php?t=58882")
+        label.clicked.connect(self.thread_clicked)
+        label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        links.append(label)
+        self.layout().addWidget(label, 4, 1)
+        
+        label = QLabel("Bug tracker")
+        topics.append(label)       
+        self.layout().addWidget(label, 5, 0, Qt.AlignRight)
+        
+        label = QPushButton("http://github.com/jonnenauha/DropN900/issues")
+        label.clicked.connect(self.tracker_clicked)
+        label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        links.append(label)
+        self.layout().addWidget(label, 5, 1)
+        
+        label = QLabel("Icons")
+        topics.append(label)       
+        self.layout().addWidget(label, 6, 0, Qt.AlignRight)
+        
+        label = QPushButton("http://openiconlibrary.sourceforge.net")
+        label.clicked.connect(self.icons_clicked)
+        label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        links.append(label)
+        self.layout().addWidget(label, 6, 1)
+                
+        label = QLabel("Donate")
+        topics.append(label)       
+        self.layout().addWidget(label, 7, 0, Qt.AlignRight)
+        
+        label = QLabel("Paypal with above email or click")
+        self.layout().addWidget(label, 7, 1)
+        
+        button = QPushButton()
+        button.clicked.connect(self.donate_clicked)
+        button.setMinimumSize(160, 70)
+        button.setMaximumSize(160, 70)
+        button.setStyleSheet("QPushButton { background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, stop:0 rgba(37, 37, 37, 255), \
+                              stop:0.542714 rgba(66, 66, 66, 255), stop:1 rgba(39, 39, 39, 255)); border: 2px solid grey; border-radius: 15px; background-repeat: no-repeat; \
+                              background-position: center center; background-image: url(" + controller.datahandler.datapath("ui/images/paypal.gif") + ") } \
+                              QPushButton:pressed { background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, stop:0 rgba(37, 37, 37, 255), \
+                              stop:0.542714 rgba(118, 118, 118, 255), stop:1 rgba(39, 39, 39, 255)); border: 2px solid white; }")        
+        self.layout().addWidget(button, 7, 1, Qt.AlignRight)
+        self.layout().setRowMinimumHeight(7, 200)
+        
+        style = "QLabel { color: #0099FF; }"
+        for topic in topics:
+            topic.setStyleSheet(style)
+            
+        # Cant seem to change color of links no matter what
+        style = "QPushButton { background-color: transparent; border: 0px; text-decoration: underline; } \
+                 QPushButton:pressed { color: #0099FF; }"
+        for link in links:
+            link.setStyleSheet(style)
+        
+    def email_clicked(self):
+        QDesktopServices.openUrl(QtCore.QUrl("mailto:user@foo.com?subject=DropN900 Feedback"))
+        
+    def tracker_clicked(self):
+        QDesktopServices.openUrl(QtCore.QUrl("http://github.com/jonnenauha/DropN900/issues"))
+        
+    def thread_clicked(self):
+        QDesktopServices.openUrl(QtCore.QUrl("http://talk.maemo.org/showthread.php?t=58882"))
+    
+    def icons_clicked(self):
+        QDesktopServices.openUrl(QtCore.QUrl("http://openiconlibrary.sourceforge.net"))
+        
+    def donate_clicked(self):
+        QDesktopServices.openUrl(QtCore.QUrl("https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=jonne%2enauha%40evocativi%2ecom&lc=FI&item_name=Jonne%20Nauha&item_number=dropn900&currency_code=EUR&bn=PP%2dDonationsBF%3abtn_donateCC_LG%2egif%3aNonHosted"))
+    
+    
 """ TreeController handler all the interaction to/from the main QTreeWidget """
 
 class TreeController:
@@ -544,7 +588,8 @@ class TreeController:
         font.setPointSize(12)
         headers.setFont(0, font)
         headers.setFont(1, font)
-
+        headers.setSizeHint(0, QSize(350,25))
+        
         # Click tracking
         self.clicked_items = {}
         

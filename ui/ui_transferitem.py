@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'transferitem.ui'
 #
-# Created: Wed Aug  4 21:24:34 2010
+# Created: Tue Aug 10 04:38:57 2010
 #      by: PyQt4 UI code generator 4.6
 #
 # WARNING! All changes made in this file will be lost!
@@ -190,7 +190,7 @@ class Ui_TransferItem(object):
 "    color: white;\n"
 "}\n"
 "\n"
-"QLabel#title_from, #title_to {\n"
+"QLabel#title_from, #title_to, #title_upload {\n"
 "    color: #0099FF;\n"
 "    font: arial;\n"
 "}\n"

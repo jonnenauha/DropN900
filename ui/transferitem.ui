@@ -30,7 +30,7 @@ QLabel#label_filename {
 	color: white;
 }
 
-QLabel#title_from, #title_to {
+QLabel#title_from, #title_to, #title_upload {
 	color: #0099FF;
 	font: arial;
 }

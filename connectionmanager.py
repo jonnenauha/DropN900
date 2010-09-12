@@ -287,7 +287,7 @@ class ConnectionManager(QObject):
             self.logger.error("Download failed, internal error")
 
     ### UPLOAD FILE HANDLERS
-    def upload_file(self, path, root, local_file_path):
+    def upload_file(self, path, root, local_file_path, sync_upload = False):
         if not self.check_client:
             return
  
@@ -310,8 +310,9 @@ class ConnectionManager(QObject):
             self.show_information("Could not open " + local_file_path + " file for uploading", False)
             return
         
-        self.show_information("Upload queued\n" + file_name, None, 4000)
-        self.transfer_manager.handle_upload(path, root, file_obj, file_name, folder_path, root_name + path, local_file_path)
+        if sync_upload == False:
+            self.show_information("Upload queued\n" + file_name, None, 4000)
+        self.transfer_manager.handle_upload(path, root, file_obj, file_name, folder_path, root_name + path, local_file_path, sync_upload)
 
     def upload_file_callback(self, resp, params):
         if resp != None and params[0] != None and params[1] != None and params[2] != None:
@@ -399,15 +400,14 @@ class ConnectionManager(QObject):
             self.show_information("Removing of file or folder failed, internal error", False)
 
     ### NEW FOLDER HANDLERS
-
-    def create_folder(self, root, full_create_path, folder_name, update_path):
+    def create_folder(self, root, full_create_path, folder_name, update_path = None):
         # Show loading ui
         if update_path == "":
             if root == "sandbox":
                 self.show_loading_ui("Creating folder " + folder_name + "\nto DropN900")
             else:
                 self.show_loading_ui("Creating folder " + folder_name + "\nto DropBox")
-        else:
+        elif update_path != None:
             self.show_loading_ui("Creating folder " + folder_name + "\nto " + update_path)
         
         # Make thread
@@ -418,6 +418,16 @@ class ConnectionManager(QObject):
 
         # Add thread to watch list
         self.running_threads.append(worker)
+
+    def create_folder_blocking(self, full_create_path, root = "dropbox"):
+        try:
+            response = self.client.file_create_folder(root, self.encode_unicode(full_create_path))
+            if response.status == 200:
+                return True
+            else:
+                return False
+        except:
+            return False
         
     def create_folder_callback(self, resp, params):
         if resp != None and params[0] != None and params[1] != None and params[2] != None and params[3] != None:
@@ -427,16 +437,23 @@ class ConnectionManager(QObject):
             update_path = params[3]
             self.hide_loading_ui()
             if resp.status == 200:
-                self.get_automated_metadata(update_path, root)
-                self.show_information("Created folder " + folder_name + " succesfully", True)
+                if update_path != None:
+                    self.get_automated_metadata(update_path, root)
+                    self.show_information("Created folder " + folder_name + " succesfully", True)
             else:
                 self.logger.network_error(str(resp.status) + " - Could not create folder " + full_create_path)
                 self.logger.network_error(">> Reason:", resp.body)
-                self.show_information("Creating folder " + folder_name + " failed, network error", False)
+                if update_path != None:
+                    self.show_information("Creating folder " + folder_name + " failed, network error", False)
         else:
             self.hide_loading_ui()
             self.show_information("Creating folder failed, internal error", False)
 
+    def encode_unicode(self, obj, encoding = "utf-8"):
+        if isinstance(obj, basestring):
+            if isinstance(obj, unicode):
+                return obj.encode(encoding)
+        return obj
 
 """ NetworkWorker is a simple thread subclass that will do networking.
     Set method with arguments. Set callback function that will be called with self.response

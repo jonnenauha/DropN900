@@ -1,3 +1,15 @@
+dropn900-0.1.5-2 - 13.09.2010
+* Synchronization now goes both ways as follows
+* -> Upload sync updates existing files that have newer timestamp and is different size compared to server file.
+* -> Upload sync sends new files in existing dropbox paths
+* -> Upload sync sends new local folders and files that do not exist in corresponding dropbox paths
+* -> Upload sync will skip local paths that have non-ascii chars: my code would support this but dropbox python client does not however. It fails to open file objects that non-ascii chars.
+* -> Upload sync will skip temp files that end with ~
+* Sync reporting/confirmation dialog got a facelift
+* Transfers manager updated to support sync uploads
+* Removed python2.5-qt4-network and python2.5-qt4-webkit dependencies
+* Created a new about dialog with more information on the app and paypal donate link
+
 dropn900-0.1.4-1 - 05.08.2010
 * Bug fix: Certain themes had column width problems, so you could not see the item names without manual resize.
 * Bug fix: Upload goes through, but fails on internal callback after thread finishes. This resulted in not fetching the new metadata automatically for parent folder after upload.
