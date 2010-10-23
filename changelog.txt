@@ -1,4 +1,4 @@
-dropn900-0.1.5-2 - 13.09.2010
+dropn900-0.1.5-3 - 13.09.2010
 * Synchronization now goes both ways as follows
 * -> Upload sync updates existing files that have newer timestamp and is different size compared to server file.
 * -> Upload sync sends new files in existing dropbox paths

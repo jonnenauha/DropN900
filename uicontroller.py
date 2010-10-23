@@ -558,7 +558,7 @@ class AboutDialog(QDialog):
         QDesktopServices.openUrl(QtCore.QUrl("http://openiconlibrary.sourceforge.net"))
         
     def donate_clicked(self):
-        QDesktopServices.openUrl(QtCore.QUrl("https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=jonne%2enauha%40evocativi%2ecom&lc=FI&item_name=Jonne%20Nauha&item_number=dropn900&currency_code=EUR&bn=PP%2dDonationsBF%3abtn_donateCC_LG%2egif%3aNonHosted"))
+        QDesktopServices.openUrl(QtCore.QUrl("https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=jonne.nauha@evocativi.com&lc=FI&item_name=Jonne%20Nauha&item_number=dropn900&currency_code=EUR&bn=PP%2dDonationsBF%3abtn_donateCC_LG%2egif%3aNonHosted"))
     
     
 """ TreeController handler all the interaction to/from the main QTreeWidget """
