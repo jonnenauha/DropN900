@@ -1,3 +1,12 @@
+dropn900-0.1.6-1 - 24.10.2010
+* Separate confirm dialogs for upload and download
+* Options in confirmation dialogs: Download/Upload Files, Cancel, Ignore Files and for upload dialog Delete Local Files.
+* -> Delete Local Files: will remove all files that are marked as NEW FILE in known dropbox paths. If uploads still available after deletion, updates UI and reconfirms what to do. This will happen only if you have added new folders and files that are not present in the server, these you still have to delete manually if you dont want to sync them. Or just click ignore to not act on them.
+* Transfers widgets cleaned up. Sync wont create widget per sync dl/ul, but a reporting widget that will track the progress of the sync. Showing stats: time spent on upload and download, how many files uploaded/downloaded and how many left and total size of uploads/downloads. Hopefully this will bring speed to the transfers view as there are alot less items in it now.
+* Added small 'Sync Now' button to main views lower right corner. This same space will also show when a sync is in progress and the button goes away for that time.
+* Made main tree view items a little bigger with bigger font so its easier to use without stylus.
+* Internals: Much cleaner code all around for the sync ui part.
+
 dropn900-0.1.5-3 - 13.09.2010
 * Synchronization now goes both ways as follows
 * -> Upload sync updates existing files that have newer timestamp and is different size compared to server file.

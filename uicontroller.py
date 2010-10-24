@@ -88,6 +88,7 @@ class UiController:
         self.manager_ui.button_rename.clicked.connect(self.item_rename)
         self.manager_ui.button_remove.clicked.connect(self.item_remove)
         self.manager_ui.button_new_folder.clicked.connect(self.item_new_folder)
+        self.manager_ui.sync_button.clicked.connect(self.synchronize_now)
         self.last_dl_location = None
         self.last_ul_location = None
 
@@ -133,6 +134,12 @@ class UiController:
         
         ### About dialog
         self.about_dialog = AboutDialog(self)
+        
+        self.set_synching(False)
+        
+    def set_synching(self, syncing):
+        self.manager_ui.sync_button.setVisible(not syncing)
+        self.manager_ui.sync_label.setVisible(syncing)
 
     def set_settings_widget(self, settings_widget):
         self.settings_widget = settings_widget

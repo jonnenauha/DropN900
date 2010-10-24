@@ -16,6 +16,7 @@ from data import Collection, Resource
 from connectionmanager import NetworkWorker
 from ui.ui_transferwidget import Ui_TransferWidget
 from ui.ui_transferitem import Ui_TransferItem
+from ui.ui_synctransferitem import Ui_SyncTransferItem
 
 """ Sync manager handles manual and automatic syncs """
 
@@ -117,6 +118,7 @@ class SyncManager(QObject):
         self.sync_total_results = []
         
         self.ui.show_banner("Preparing synchronization, please wait...", 2000)
+        self.ui.set_synching(True)
         
         # Make metadata fetch thread
         metadata_worker = NetworkWorker()
@@ -183,80 +185,55 @@ class SyncManager(QObject):
             self.logger.sync_error("Parsing sync path metadata failed: " + str(e))
             return None
             
-    def finish_sync(self):
-        sync_confirmation = QMessageBox(self.ui.main_widget)
-        continue_button = sync_confirmation.addButton("Continue", QMessageBox.YesRole)
-        cancel_button = sync_confirmation.addButton("Cancel", QMessageBox.NoRole)
-        sync_confirmation.setWindowTitle("Synchronization Confirmation")
+    def finish_sync(self):       
+        confirm_dl = True
+        confirm_ul = True
+        new_ul_files = False
         
-        main_layout = QGridLayout()
-        main_layout.setHorizontalSpacing(15)
-        main_layout.setContentsMargins(0,0,0,0)
-        
-        row = 0
-        hide_dl_items = []
-        hide_ul_items = []
-        
-        # Titles
-        style = "QLabel { font-size: 16pt; color: #0099FF; font-weight: bold;}"
-        l = QLabel("Downloading")
-        hide_dl_items.append(l)
-        l.setStyleSheet(style)
-        main_layout.addWidget(l, row, 0)
-        l = QLabel("Files")
-        hide_dl_items.append(l)
-        l.setStyleSheet(style)
-        main_layout.addWidget(l, row, 1)
-        l = QLabel("Size")
-        hide_dl_items.append(l)
-        l.setStyleSheet(style)
-        main_layout.addWidget(l, row, 2, Qt.AlignRight)
-        
-        # Information
-        total_files = 0
-        total_folders = 0
-        total_bytes = 0
-        total_ul_files = 0
-        total_ul_bytes = 0
+        confirmation_dl = SyncDialog(self.ui.main_widget)
+        confirmation_dl.setWindowTitle("Synchronization Download Confirmation")
+        button_dl_continue = confirmation_dl.addButton("Download All", QMessageBox.YesRole)
+        button_dl_ignore = confirmation_dl.addButton("Ignore Files", QMessageBox.ActionRole)
+        button_dl_cancel = confirmation_dl.addButton("Cancel", QMessageBox.NoRole)
 
-        # Iterate all results for downloads
+        confirmation_ul = SyncDialog(self.ui.main_widget)    
+        confirmation_ul.setWindowTitle("Synchronization Upload Confirmation")
+        button_ul_continue = confirmation_ul.addButton("Upload All", QMessageBox.YesRole)
+        button_ul_ignore = confirmation_ul.addButton("Ignore Files", QMessageBox.ActionRole)
+        button_ul_cancel = confirmation_ul.addButton("Cancel", QMessageBox.NoRole)
+        button_ul_remove = confirmation_ul.addButton("Remove New \nLocal Files", QMessageBox.DestructiveRole)
+                
+        # DOWNLOADS
+        total_dl_files = 0
+        total_dl_folders = 0
+        total_dl_bytes = 0
+        
+        confirmation_dl.add_titles("Downloading", "Files", "Size")
+
+        # Download files
         for result in self.sync_total_results:
-            folder_files = result.total_dl_files
-            total_files += folder_files
-            folder_bytes = result.total_dl_bytes
-            total_bytes += folder_bytes
-            if folder_files > 0:
-                row += 1 
-                total_folders += 1
-                main_layout.addWidget(QLabel(result.remote_path), row, 0)
-                main_layout.addWidget(QLabel(str(folder_files)), row, 1)
-                main_layout.addWidget(QLabel(self.datahandler.humanize_bytes(folder_bytes)), row, 2, Qt.AlignRight)           
+            if result.total_dl_files == 0:
+                continue
+            total_dl_folders += 1
+            total_dl_files += result.total_dl_files
+            total_dl_bytes += result.total_dl_bytes
+            confirmation_dl.add_row(result.remote_path, str(result.total_dl_files), self.datahandler.humanize_bytes(result.total_dl_bytes))
         
-        # Add total download numbers
-        row += 1
-        style = "QLabel { font-size: 14pt; color: rgb(94,189,0); }"
-        l = QLabel("Total")
-        hide_dl_items.append(l)
-        l.setStyleSheet(style)
-        main_layout.addWidget(l, row, 0)
-        l = QLabel(str(total_files))
-        hide_dl_items.append(l)
-        l.setStyleSheet(style)
-        main_layout.addWidget(l, row, 1)
-        try:
-            total_size_string = self.datahandler.humanize_bytes(total_bytes)
-        except:
-            total_size_string = "unknown"
-        l = QLabel(total_size_string)
-        hide_dl_items.append(l)
-        l.setStyleSheet(style)
-        main_layout.addWidget(l, row, 2, Qt.AlignRight)
+        # Totals
+        confirmation_dl.add_totals("Total", str(total_dl_files), self.datahandler.humanize_bytes(total_dl_bytes))
+        if total_dl_files == 0:
+            confirm_dl = False
+
+        confirmation_dl.finalize()
         
-        # Search for uploads
-        row += 1
-        ul_title_row = row
+        # UPLOAD
         total_ul_files = 0
+        total_ul_folders = 0
         total_ul_bytes = 0
+        
+        confirmation_ul.add_titles("Uploading", "Files", "Size")
+        
+        # Upload files
         create_new_folders = []
         all_skipped_uploads = []
         for result in self.sync_total_results:
@@ -265,22 +242,15 @@ class SyncManager(QObject):
             all_skipped_uploads += result.skipped_uploads
             # New files to upload
             for filename in result.new_files_to_upload:
-                row += 1
-                label = QLabel("NEW FILE")
+                new_ul_files = True
                 fileonly = filename.split("/")[-1]
-                main_layout.addWidget(QLabel(result.remote_path + "/" + fileonly), row, 0)
-                main_layout.addWidget(label, row, 1)
-                main_layout.addWidget(QLabel(self.datahandler.humanize_bytes(os.path.getsize(filename))), row, 2, Qt.AlignRight)
+                confirmation_ul.add_row(result.remote_path + "/" + fileonly, "NEW FILE", self.datahandler.humanize_bytes(os.path.getsize(filename)))
             # Files to update
             for filename in result.out_of_date_files_upload:
-                row += 1       
-                label = QLabel("CHANGED FILE")
                 fileonly = filename.split("/")[-1]
-                main_layout.addWidget(QLabel(result.remote_path + "/" + fileonly), row, 0)
-                main_layout.addWidget(label, row, 1)
-                main_layout.addWidget(QLabel(self.datahandler.humanize_bytes(os.path.getsize(filename))), row, 2, Qt.AlignRight)
+                confirmation_ul.add_row(result.remote_path + "/" + fileonly, "CHANGED FILE", self.datahandler.humanize_bytes(os.path.getsize(filename)))               
             # New folders and files under them to upload
-            for (remote_folder, local_files) in result.new_folders_to_files.iteritems():
+            for (remote_folder, local_files) in result.new_folders_to_files.iteritems(): 
                 create_new_folders.append(result.remote_path + "/" + remote_folder)
                 folder_size = 0
                 folder_files = 0
@@ -289,138 +259,117 @@ class SyncManager(QObject):
                     folder_files += 1
                 total_ul_bytes += folder_size
                 total_ul_files += folder_files
-                row += 1       
+                total_ul_folders += 1 
                 if folder_files == 0:
                     continue
-                label = QLabel(str(folder_files))
-                main_layout.addWidget(QLabel(result.remote_path + "/" + remote_folder), row, 0)
-                main_layout.addWidget(label, row, 1)
-                main_layout.addWidget(QLabel(self.datahandler.humanize_bytes(folder_size)), row, 2, Qt.AlignRight)
-                
-        # Add total upload numbers
-        row += 1
-        style = "QLabel { font-size: 14pt; color: rgb(94,189,0); }"
-        l = QLabel("Total")
-        hide_ul_items.append(l)
-        l.setStyleSheet(style)
-        main_layout.addWidget(l, row, 0)
-        l = QLabel(str(total_ul_files))
-        hide_ul_items.append(l)
-        l.setStyleSheet(style)
-        main_layout.addWidget(l, row, 1)
-        try:
-            total_ul_size_string = self.datahandler.humanize_bytes(total_ul_bytes)
-        except:
-            total_ul_size_string = "unknown"
-        l = QLabel(total_ul_size_string)
-        hide_ul_items.append(l)
-        l.setStyleSheet(style)
-        main_layout.addWidget(l, row, 2, Qt.AlignRight)
-                        
-        # Upload titles
-        style = "QLabel { font-size: 16pt; color: #0099FF; font-weight: bold;}"
-        l = QLabel("Uploading")
-        hide_ul_items.append(l)
-        l.setStyleSheet(style)
-        main_layout.addWidget(l, ul_title_row, 0, Qt.AlignBottom)
-        l = QLabel("Files")
-        hide_ul_items.append(l)
-        l.setStyleSheet(style)
-        main_layout.addWidget(l, ul_title_row, 1, Qt.AlignBottom)
-        l = QLabel("Size")
-        hide_ul_items.append(l)
-        l.setStyleSheet(style)
-        main_layout.addWidget(l, ul_title_row, 2, Qt.AlignBottom|Qt.AlignRight)
-        main_layout.setRowMinimumHeight(ul_title_row, 40)
+                confirmation_ul.add_row(result.remote_path + "/" + remote_folder, str(folder_files), self.datahandler.humanize_bytes(folder_size))
         
-        # Creating New Folders
+        # Totals
+        confirmation_ul.add_totals("Total", str(total_ul_files), self.datahandler.humanize_bytes(total_ul_bytes))
+        if total_ul_files == 0:
+            confirm_ul = False
+
+        # New folders
         if len(create_new_folders) > 0:
             create_new_folders.sort()
-            row += 1
-            style = "QLabel { font-size: 16pt; color: #0099FF; font-weight: bold;}"
-            l = QLabel("Creating New Folders to DropBox")
-            l.setStyleSheet(style)
-            main_layout.addWidget(l, row, 0, Qt.AlignBottom)
+            confirmation_ul.add_spacer()
+            confirmation_ul.add_titles("Creating New Folders to DropBox")
             for remote_path in create_new_folders:
-                row += 1
-                l = QLabel(remote_path)
-                main_layout.addWidget(l, row, 0, Qt.AlignBottom)
-
-        # Make a scrollview
-        view_widget = QWidget()
-        view_widget.setFont(QFont("Arial", 14))
-        view_widget_l = QVBoxLayout()
-        view_widget_l.addLayout(main_layout)
-        view_widget_l.addSpacerItem(QSpacerItem(1, 1, QSizePolicy.Minimum, QSizePolicy.Expanding))
-        view_widget.setLayout(view_widget_l)
-        view = QScrollArea()
-        view.setWidget(view_widget)
-        view.setWidgetResizable(True)
-        view.setMinimumHeight(360)
-                    
-        # Add nothing to dl/ul report
-        if total_files == 0 and total_ul_files == 0:
-            # Modify controls and title
-            cancel_button.setText("Close")
-            sync_confirmation.setWindowTitle("Synchronization Report")
-            sync_confirmation.removeButton(continue_button)
-            # Add title
-            row += 1
-            style = "QLabel { font-size: 20pt; color: #0099FF; font-weight: bold;}"
-            l = QLabel("Nothing to sync, all files up to date!")
-            l.setStyleSheet(style)
-            main_layout.addWidget(l, row, 0, Qt.AlignBottom)
-            row += 1
-            main_layout.addWidget(QLabel(""), row, 0, Qt.AlignBottom)
-            if len(all_skipped_uploads) == 0:
-                view.setMinimumHeight(150)
-                    
-        # Report skipped paths
-        if len(all_skipped_uploads) > 0:
-            all_skipped_uploads.sort()
-            row += 1
-            style = "QLabel { font-size: 14pt; color: red; font-weight: bold;}"
-            l = QLabel("Skipping uploads: non ASCII chars in path and ~ temp files")
-            l.setStyleSheet(style)
-            main_layout.addWidget(l, row, 0, Qt.AlignBottom)
-            for skipped_path in all_skipped_uploads:
-                row += 1
-                l = QLabel(skipped_path)
-                main_layout.addWidget(l, row, 0, Qt.AlignBottom)
-        
-        # Add view and show dialog
-        sync_confirmation.layout().setHorizontalSpacing(0)
-        sync_confirmation.layout().setVerticalSpacing(0)
-        sync_confirmation.layout().setContentsMargins(0,0,10,10)
-        sync_confirmation.layout().addWidget(view, 0, 0)
-
-        # Hide titles if no items
-        if total_files == 0:
-            for label in hide_dl_items:
-                label.hide()
-        if total_ul_files == 0:
-            for label in hide_ul_items:
-                label.hide()
+                confirmation_ul.add_row(remote_path)
+                
+        confirmation_ul.finalize()
                                 
         # Show confirmation dialog
-        if total_files > 0 or total_ul_files > 0:
-            confirmation = sync_confirmation.exec_()
-    
-            # Check confirmation
-            if confirmation == 1:
-                del sync_confirmation
-                return
-            if confirmation == 0:
-                # Update ui and log
-                post_files = " file from " if total_files == 1 else " files from "
-                post_folders = " folder" if total_folders == 1 else " folders"
-                banner_total_size_string = ", total of " + total_size_string if total_size_string != "unknown" else ""
-                message = "Downloading " + str(total_files) + post_files + str(total_folders) + post_folders + banner_total_size_string
-                self.logger.sync(message)
+        if confirm_dl == True or confirm_ul == True:
+            # DL dialog: OK = 0, IGNORE = 1, CANCEL = 2
+            # UL dialog: OK = 0, IGNORE = 1, CANCEL = 2, REMOVE LOCAL = 3
+            answer_dl = -1
+            answer_ul = -1
+            if confirm_dl:
+                answer_dl = confirmation_dl.exec_()
+                if answer_dl == 2:
+                    del confirmation_dl
+                    del confirmation_ul
+                    self.ui.show_banner("Synchronization canceled")
+                    self.ui.set_synching(False)
+                    return
+            if confirm_ul:
+                if new_ul_files == False:
+                    button_ul_remove.hide()
+                answer_ul = confirmation_ul.exec_()
+                if answer_ul == 2:
+                    del confirmation_dl
+                    del confirmation_ul
+                    self.ui.show_banner("Synchronization canceled")
+                    self.ui.set_synching(False)
+                    return
+                elif answer_ul == 3:
+                    self.ui.show_banner("Removing new local files\nPlease wait...", 2000)
+                    # Remove new local files and ask again
+                    uploads_remaining = False
+                    self.logger.sync("Removing local files that were not in DropBox")
+                    for sync_result in self.sync_total_results:
+                        for filepath in sync_result.new_files_to_upload:
+                            self.logger.sync("- " + filepath)
+                            total_ul_files -= 1
+                            total_ul_bytes -= os.path.getsize(filepath)
+                            os.remove(filepath)                
+                        if len(sync_result.new_folders_to_files) > 0 or len(sync_result.out_of_date_files_upload) > 0:
+                            uploads_remaining = True
+                        sync_result.new_files_to_upload = []
+                    # Reconfirm if needed
+                    if uploads_remaining:
+                        confirmation_ul.hide_new_uploads()
+                        button_ul_remove.hide()
+                        confirmation_ul.set_totals(str(total_ul_files), self.datahandler.humanize_bytes(total_ul_bytes))
+                        answer_ul = confirmation_ul.exec_()
+                    else:
+                        answer_ul = -1
+              
+            # Check for additional child results, these are present 
+            # if we have totally new folders with new files for upload
+            additional_results = []
+            for sync_result in self.sync_total_results:
+                if len(sync_result.child_upload_results) > 0:
+                    additional_results += sync_result.child_upload_results
+            self.sync_total_results += additional_results
+            store_dir = self.datahandler.get_data_dir_path()
+
+            sync_widget = None
+            if answer_dl == 0 or answer_ul == 0:
+                sync_widget = SyncTransferItem(self)
+                sync_widget.set_totals(total_dl_files, total_ul_files)
+                sync_widget.set_sizes(self.datahandler.humanize_bytes(total_dl_bytes), self.datahandler.humanize_bytes(total_ul_bytes))
+                self.controller.transfer_manager.set_current_sync(sync_widget)
+                self.controller.transfer_widget.add_sync_reporting(sync_widget)
                 
-                post_ul_files = " file" if total_ul_files == 1 else " files"
-                banner_total_ul_size_string = ", total of " + total_ul_size_string if total_ul_size_string != "unknown" else ""
-                message_ul = "Uploading " + str(total_ul_files) + post_ul_files + banner_total_ul_size_string
+            # Do downloads
+            if answer_dl == 0:
+                # Update ui and log
+                post_files = " file from " if total_dl_files == 1 else " files from "
+                post_folders = " folder" if total_dl_folders == 1 else " folders"
+                banner_total_size_string = ", total of " + self.datahandler.humanize_bytes(total_dl_bytes)
+                message = "Downloading " + str(total_dl_files) + post_files + str(total_dl_folders) + post_folders + banner_total_size_string
+                self.logger.sync(message)
+
+                for sync_result in self.sync_total_results:
+                    # Create directory
+                    if sync_result.local_folder_exists == False:
+                        sync_result.create_local_path()
+                    # Queue downloads
+                    for sync_file in sync_result.out_of_date_files:
+                        self.connection.get_file(sync_file.path, sync_file.root, sync_result.local_path + "/" + sync_file.get_name(), sync_file.size, sync_file.mime_type, True)
+            elif answer_dl == 1:
+                self.logger.sync("Ignoring downloads")
+            elif answer_dl == -1:
+                self.logger.sync("No synchronization downloads, all file up to date")    
+              
+            # Do uploads
+            if answer_ul == 0:
+                post_ul_files = " file and creating " if total_ul_files == 1 else " files and "
+                post_ul_folders = " folder" if total_ul_folders == 1 else " folders"
+                banner_total_ul_size_string = ", total of " + self.datahandler.humanize_bytes(total_ul_bytes)
+                message_ul = "Uploading " + str(total_ul_files) + post_ul_files + str(total_ul_folders) + post_ul_folders + banner_total_ul_size_string
                 self.logger.sync(message_ul)
                 
                 # Create new remote dirs
@@ -432,33 +381,28 @@ class SyncManager(QObject):
                         else:
                             self.logger.info("Failed to create remote folder " + remote_path)
 
-                # Check for additional child results, these are present 
-                # if we have totally new folders with new files for upload
-                additional_results = []
                 for sync_result in self.sync_total_results:
-                    if len(sync_result.child_upload_results) > 0:
-                        additional_results += sync_result.child_upload_results
-                self.sync_total_results += additional_results
-
-                # DL/UL files from/to dropbox
-                store_dir = self.datahandler.get_data_dir_path()
-                for sync_result in self.sync_total_results:
-                    # Create directory
-                    if sync_result.local_folder_exists == False:
-                        sync_result.create_local_path()
-                    # Queue downloads
-                    for sync_file in sync_result.out_of_date_files:
-                        self.connection.get_file(sync_file.path, sync_file.root, sync_result.local_path + "/" + sync_file.get_name(), sync_file.size, sync_file.mime_type, True)
                     # Queue uploads
                     for ul_sync_file in sync_result.out_of_date_files_upload:
                         self.connection.upload_file(sync_result.remote_path, "dropbox", ul_sync_file, True)
                     for ul_sync_file in sync_result.new_files_to_upload:
                         self.connection.upload_file(sync_result.remote_path, "dropbox", ul_sync_file, True)
-                self.controller.transfer_widget.add_sync_widget(self.sync_root.path, store_dir + self.sync_root.name, total_folders, total_files, total_size_string, total_ul_files, total_ul_size_string)
+            elif answer_ul == 1:
+                self.logger.sync("Ignoring uploads")
+            elif answer_dl == -1:
+                self.logger.sync("No synchronization uploads, all file up to date")    
+                       
+            if sync_widget != None:
                 self.ui.show_transfer_widget()
+            else:
+                self.ui.set_synching(False)
         else:
-            sync_confirmation.exec_()
-        del sync_confirmation
+            self.ui.show_banner("Nothing to sync - all files up to date")
+            self.ui.set_synching(False)
+
+        # Cleanup
+        del confirmation_dl
+        del confirmation_ul
 
 
 """ SyncRoot has data about the main synchronization path """
@@ -676,7 +620,127 @@ class SyncResult:
             if not isinstance(obj, unicode):
                 obj = unicode(obj, encoding)
         return obj
+
+
+""" SyncDialog is for showing information of sync results and provides button for how to proceed """
         
+class SyncDialog(QMessageBox):
+
+    def __init__(self, par):
+        QMessageBox.__init__(self)
+                    
+        # Grid layout
+        self.grid_layout = QGridLayout()
+        self.grid_layout.setHorizontalSpacing(15)
+        self.grid_layout.setContentsMargins(0,0,0,0)
+        
+        # Make a main widget with the grid layout
+        self.widget = QWidget()
+        self.widget.setFont(QFont("Arial", 14))
+        self.widget.setLayout(QVBoxLayout())
+        self.widget.layout().addLayout(self.grid_layout)
+        
+        # Make a scrollview for the box itself
+        self.view = QScrollArea()
+        self.view.setWidget(self.widget)
+        self.view.setWidgetResizable(True)
+        self.view.setMinimumHeight(360)
+
+        # Add view and show dialog
+        self.layout().setHorizontalSpacing(0)
+        self.layout().setVerticalSpacing(0)
+        self.layout().setContentsMargins(0,0,10,10)
+        self.layout().addWidget(self.view, 0, 0)
+        self.layout().addWidget(self.view, 0, 0)
+        
+        # Internal data
+        self.row = -1
+        self.style_title = "QLabel { font-size: 20pt; color: #0099FF; font-weight: bold;}"
+        self.style_totals = "QLabel { font-size: 14pt; color: rgb(94,189,0); }"
+        
+        self.new_file_widgets = []
+        
+        self.label_total_files = None
+        self.label_total_size = None
+
+    def iterate_row(self):
+        self.row += 1
+
+    def add_spacer(self, height = 15):
+        self.iterate_row()
+        self.grid_layout.addItem(QSpacerItem(1, height, QSizePolicy.Fixed, QSizePolicy.Fixed), self.row, 0)
+        
+    def finalize(self):
+        self.widget.layout().addSpacerItem(QSpacerItem(1, 1, QSizePolicy.Fixed, QSizePolicy.Expanding))
+
+    def add_titles(self, text1, text2 = None, text3 = None):
+        self.iterate_row()
+        l1 = QLabel(text1)
+        l1.setStyleSheet(self.style_title)
+        if text2 != None:
+            l2 = QLabel(text2)
+            l2.setStyleSheet(self.style_title)
+        else:
+            l2 = None
+        if text3 != None:
+            l3 = QLabel(text3)
+            l3.setStyleSheet(self.style_title)
+        else:
+            l3 = None
+        self.add_widgets(l1, l2, l3)
+                
+    def add_row(self, text1, text2 = None, text3 = None):
+        self.iterate_row()
+        l1 = QLabel(text1)
+        l2 = None
+        l3 = None
+        if text2 != None:
+            l2 = QLabel(text2)
+        if text3 != None:
+            l3 = QLabel(text3)
+        self.add_widgets(l1, l2, l3)
+        
+        if text2 == "NEW FILE":
+            self.new_file_widgets.append(l1)
+            self.new_file_widgets.append(l2)
+            self.new_file_widgets.append(l3)
+            
+    def add_totals(self, text1, text2 = None, text3 = None):
+        self.iterate_row()
+        l1 = QLabel(text1)
+        l1.setStyleSheet(self.style_totals)
+        if text2 != None:
+            l2 = QLabel(text2)
+            l2.setStyleSheet(self.style_totals)
+            self.label_total_files = l2
+        else:
+            l2 = None
+        if text3 != None:
+            l3 = QLabel(text3)
+            l3.setStyleSheet(self.style_totals)
+            self.label_total_size = l3
+        else:
+            l3 = None
+        self.add_widgets(l1, l2, l3)
+        
+    def add_widgets(self, w1, w2, w3, align = Qt.AlignBottom):
+        self.grid_layout.addWidget(w1, self.row, 0, align)
+        if w2 != None:
+            self.grid_layout.addWidget(w2, self.row, 1, align)
+        if w3 != None:
+            self.grid_layout.addWidget(w3, self.row, 2, align | Qt.AlignRight)
+
+    def hide_new_uploads(self):
+        for w in self.new_file_widgets:
+            w.hide()
+            
+    def set_totals(self, files, size):
+        if self.label_total_files != None:
+            self.label_total_files.setText(files)
+        if self.label_total_size != None:
+            self.label_total_size.setText(size)
+
+
 """ TransferManager monitors upload/downloads and relays info to TransferWidget """
 
 class TransferManager(QObject):
@@ -706,9 +770,14 @@ class TransferManager(QObject):
         
         # Tranfer to ui item dict
         self.tranfer_to_widget = {}
+        
+        self.sync_widget = None
 
     def set_client(self, client):
         self.client = client
+        
+    def set_current_sync(self, widget):
+        self.sync_widget = widget
         
     def set_transfer_widget(self, transfer_widget):
         self.transfer_widget = transfer_widget
@@ -774,9 +843,13 @@ class TransferManager(QObject):
         download.set_callback(self.connection.get_file_callback, device_store_path, file_name)
         download.set_download_info(file_name, device_store_path)
         
-        device_path = device_store_path[0:device_store_path.rfind("/")]
-        download_item = self.transfer_widget.add_download(file_name, dropbox_path, device_path, size, mime_type, sync_download)
-        self.tranfer_to_widget[download] = download_item
+        if sync_download and self.sync_widget != None:
+            download.setup_reporting(self.sync_widget)
+            self.tranfer_to_widget[download] = self.sync_widget
+        else:
+            device_path = device_store_path[0:device_store_path.rfind("/")]
+            download_item = self.transfer_widget.add_download(file_name, dropbox_path, device_path, size, mime_type, sync_download)
+            self.tranfer_to_widget[download] = download_item
         
         self.queued_transfer_threads.append(download)
         self.check_transfer_queue()
@@ -786,12 +859,17 @@ class TransferManager(QObject):
         upload.set_callable(self.client.put_file, root, path, file_obj)
         upload.set_callback(self.connection.upload_file_callback, root, path, file_name)
         upload.set_upload_info(file_name, dropbox_store_path)
-        try:
-            size = self.datahandler.humanize_bytes(os.path.getsize(local_file_path))
-        except:
-            size = ""
-        upload_item = self.transfer_widget.add_upload(file_name, from_local_path, dropbox_store_path, size, sync_upload)
-        self.tranfer_to_widget[upload] = upload_item
+        
+        if sync_upload and self.sync_widget != None:
+            upload.setup_reporting(self.sync_widget)
+            self.tranfer_to_widget[upload] = self.sync_widget
+        else:
+            try:
+                size = self.datahandler.humanize_bytes(os.path.getsize(local_file_path))
+            except:
+                size = ""
+            upload_item = self.transfer_widget.add_upload(file_name, from_local_path, dropbox_store_path, size, sync_upload)
+            self.tranfer_to_widget[upload] = upload_item
         
         self.queued_transfer_threads.append(upload)
         self.check_transfer_queue()
@@ -808,6 +886,7 @@ class TransferWorker(NetworkWorker):
         self.file_name = None
         self.store_path = None
         self.data = None
+        self.report = None
 
     def set_download_info(self, file_name, device_store_path):
         self.file_name = file_name
@@ -816,7 +895,10 @@ class TransferWorker(NetworkWorker):
     def set_upload_info(self, file_name, dropbox_store_path):
         self.file_name = file_name
         self.store_path = dropbox_store_path
-
+        
+    def setup_reporting(self, report):
+        self.report = report
+        
     def run(self):
         encoded_params = []
         for param in self.parameters:
@@ -824,6 +906,10 @@ class TransferWorker(NetworkWorker):
             encoded_params.append(param)
 
         try:
+            # Reporting
+            if self.report != None:
+                self.report.started(self.transfer_type, self.file_name)
+                
             self.response = self.method(*tuple(encoded_params))
             if self.response != None:
                 if self.transfer_type == "Download":
@@ -833,10 +919,16 @@ class TransferWorker(NetworkWorker):
             else:
                 self.error = "Response None, with status code " + self.response.status
                 self.data = None
+                
+            # Reporting
+            if self.report != None:
+                self.report.completed(self.transfer_type, self.file_name)
         except (socket.error, socket.gaierror), err:
             self.response = None
             self.error = err
             self.data = None
+            if self.report != None:
+                self.report.failed(self.transfer_type, self.file_name)
         
 """ TransferWidget is a tranfer monitoring widget """
 
@@ -926,6 +1018,11 @@ class TransferWidget(QMainWindow):
         self.layout_check()
         return upload_item
         
+    def add_sync_reporting(self, sync_widget):
+        self.ui.item_layout.insertWidget(0, sync_widget)
+        sync_widget.show()
+        self.layout_check()
+        
     def add_sync_widget(self, sync_path, local_store_path, total_dl_folders, total_dl_files, total_dl_size, total_ul_files, total_ul_size):
         sync_information = TransferItem(self, "Synchronization", True)
         sync_information.set_icon(self.icon_sync, True)
@@ -941,7 +1038,192 @@ class TransferWidget(QMainWindow):
                 self.ui.label_first_time_note.hide()
                 self.ui.label_first_time_icon.hide()
                 
+
+""" SyncTransferItem is a custom list widget that shows tranfer status of a sync """
+
+class SyncTransferItem(QWidget):
+    
+    def __init__(self, parent):
+        QWidget.__init__(self)
+        self.ui = Ui_SyncTransferItem()
+        self.ui.setupUi(self)
+        self.parent = parent
+        
+        self.total_dl = 0
+        self.total_ul = 0
+        self.current_dl = 0        
+        self.current_ul = 0
+        
+        self.sync_icon = QPixmap(self.parent.datahandler.datapath("ui/icons/item_sync.png"))
+        self.set_icon(self.sync_icon)
+        
+        self.ui.dl_status.setText("Waiting...")
+        self.ui.ul_status.setText("Waiting...")
+        
+        self.downloads_done = False
+        self.uploads_done = False
+        self.internal_do_started = False
+        self.internal_do_completed = False
+        
+        self.loading_animation = QMovie(self.parent.datahandler.datapath("ui/images/loading.gif"), "GIF")
+        self.loading_animation.setCacheMode(QMovie.CacheAll)
+        self.loading_animation.setScaledSize(QSize(48,48))
+        self.loading_animation.setSpeed(75)
+
+        self.timer_dl = QTimer()
+        self.timer_dl.timeout.connect(self.set_dl_duration)
+        self.dl_duration_sec = 0
+        self.dl_duration_min = 0
+        
+        self.timer_ul = QTimer()
+        self.timer_ul.timeout.connect(self.set_ul_duration)
+        self.ul_duration_sec = 0
+        self.ul_duration_min = 0
+        
+        self.poller = QTimer()
+        self.poller.timeout.connect(self.poll_input)
+        self.poller.start(50)
+
+    def set_dl_duration(self):
+        self.dl_duration_sec += 1
+        if self.dl_duration_sec == 60:
+            self.dl_duration_min += 1
+            self.dl_duration_sec = 0
+        if self.dl_duration_min > 0 and self.dl_duration_sec < 10:
+            duration = "0" + str(self.dl_duration_sec) + " sec"
+        else:
+            duration = str(self.dl_duration_sec) + " sec"
+        if self.dl_duration_min > 0:
+            duration = str(self.dl_duration_min) + " min " + duration
+        self.ui.dl_timer_label.setText(duration)
+        
+    def set_ul_duration(self):
+        self.ul_duration_sec += 1
+        if self.ul_duration_sec == 60:
+            self.ul_duration_min += 1
+            self.ul_duration_sec = 0
+        if self.ul_duration_min > 0 and self.ul_duration_sec < 10:
+            duration = "0" + str(self.ul_duration_sec) + " sec"
+        else:
+            duration = str(self.ul_duration_sec) + " sec"
+        if self.ul_duration_min > 0:
+            duration = str(self.ul_duration_min) + " min " + duration
+        self.ui.ul_timer_label.setText(duration)
+        
+    def set_status(self, status):
+        self.ui.status_label.setText(status)
+        
+    def set_totals(self, download, upload):
+        self.total_dl = download
+        self.total_ul = upload
+        self.ui.dl_total.setText(str(download))
+        self.ui.ul_total.setText(str(upload))
+        
+        if self.total_dl == 0:
+            self.downloads_done = True
+            self.ui.dl_status.setText("")
+            self.ui.dl_total.setText("-")
+            self.ui.dl_present.setText("-")
+            self.ui.dl_separator2.hide()
+            self.ui.dl_size.hide()
+        if self.total_ul == 0:
+            self.uploads_done = True
+            self.ui.ul_status.setText("")
+            self.ui.ul_total.setText("-")
+            self.ui.ul_present.setText("-")
+            self.ui.ul_separator2.hide()
+            self.ui.ul_size.hide()
+            
+    def set_sizes(self, download, upload):
+        self.ui.dl_size.setText(download)
+        self.ui.ul_size.setText(upload)
+            
+    def iter_downloads(self):
+        if self.current_dl == 0:
+            self.timer_dl.start(1000)
+        self.current_dl += 1
+        self.ui.dl_present.setText(str(self.current_dl))
+        if self.current_dl == self.total_dl:
+            self.timer_dl.stop()
+            self.downloads_done = True
+            self.ui.dl_status.setText("")
+            self.check_completed()
+        
+    def iter_uploads(self):
+        if self.current_ul == 0:
+            self.timer_ul.start(1000)
+        self.current_ul += 1
+        self.ui.ul_present.setText(str(self.current_ul))
+        if self.current_ul == self.total_ul:
+            self.timer_ul.stop()
+            self.uploads_done = True
+            self.ui.ul_status.setText("")
+            self.check_completed()
+        
+    def set_icon(self, pixmap):
+        self.ui.main_icon.setPixmap(pixmap)
+            
+    def set_started(self, status = None):
+        pass
+        
+    def set_completed(self, status = None):
+        pass
+    
+    def set_failed(self, status = None):
+        pass
+
+    def poll_input(self):
+        if self.internal_do_completed:
+            self.completed_internal()
+        if self.internal_do_started:
+            self.started_internal()
+                    
+    def started(self, transfer_type, filename):
+        self.internal_do_started = True
+        self.internal_start_type = transfer_type
+        self.internal_start_filename = filename
                 
+    def started_internal(self):
+        if self.downloads_done == False or self.uploads_done == False:
+            if self.loading_animation.state() != QMovie.Running:
+                self.ui.main_icon.setMovie(self.loading_animation)
+                self.loading_animation.start()
+    
+        self.set_status(self.internal_start_type + "ing...")
+        if self.internal_start_type == "Download":
+            self.ui.dl_status.setText("Processing " + self.internal_start_filename)
+        else:
+            self.ui.ul_status.setText("Processing " + self.internal_start_filename)
+        self.internal_do_started = False
+                
+    def completed(self, transfer_type, filename):
+        self.internal_do_completed = True
+        self.internal_iter_type = transfer_type
+        
+    def completed_internal(self):
+        if self.internal_iter_type == "Download":
+            self.iter_downloads()
+        else:
+            self.iter_uploads()
+        self.internal_do_completed = False
+        
+    def failed(self, transfer_type, filename):
+        print "Failed   : " + transfer_type + " --- " + filename
+        
+    def check_completed(self):
+        if self.downloads_done and self.uploads_done:
+            self.sync_complete()
+    
+    def sync_complete(self):
+        self.ui.status_label.setText("Synchronization completed")
+        self.ui.dl_status.setText("")
+        self.ui.ul_status.setText("")
+        self.loading_animation.stop()
+        self.set_icon(self.sync_icon)
+        self.parent.ui.set_synching(False)
+        self.ui.content_frame.setStyleSheet("QFrame#content_frame{border: 0px;border-bottom: 1px solid grey;background-color: \
+            qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, stop:0 rgba(0, 7, 0, 255), stop:0.502513 rgba(0, 50, 0, 200), stop:1 rgba(0, 0, 0, 255));}")
+        
 """ TransferItem is a custom list widget that shows tranfer data """
 
 class TransferItem(QWidget):

@@ -84,7 +84,7 @@ QTreeWidget {
 	background-color: black;
 	alternate-background-color: rgb(36, 36, 36);
 	color: rgb(235, 235, 235);
-	font-size: 17px;
+	font-size: 15pt;
 	border: 0px;
 	border-bottom: 2px solid rgba(255,255,255,200);
 	border-right: 2px solid rgba(255,255,255,200);
@@ -96,9 +96,9 @@ QTreeWidget {
 QTreeWidget::item {
 	background-color: transparent;
 	border: 0px;
-	height: 60px;
-	min-height: 60px;
-	max-height: 60px;
+	height: 70px;
+	min-height: 70px;
+	max-height: 70px;
 	padding-left: 5px;
 }
 
@@ -199,6 +199,15 @@ QTreeView::branch:open:has-children:has-siblings  {
          </attribute>
          <attribute name="headerDefaultSectionSize">
           <number>380</number>
+         </attribute>
+         <attribute name="headerMinimumSectionSize">
+          <number>40</number>
+         </attribute>
+         <attribute name="headerDefaultSectionSize">
+          <number>380</number>
+         </attribute>
+         <attribute name="headerVisible">
+          <bool>true</bool>
          </attribute>
          <attribute name="headerMinimumSectionSize">
           <number>40</number>
@@ -561,7 +570,7 @@ QTreeView::branch:open:has-children:has-siblings  {
           <property name="maximumSize">
            <size>
             <width>16777215</width>
-            <height>24</height>
+            <height>16777215</height>
            </size>
           </property>
           <property name="font">
@@ -575,16 +584,13 @@ QTreeView::branch:open:has-children:has-siblings  {
           <property name="alignment">
            <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
           </property>
+          <property name="wordWrap">
+           <bool>true</bool>
+          </property>
          </widget>
         </item>
         <item>
          <widget class="QLabel" name="label_username_icon">
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-            <horstretch>0</horstretch>
-            <verstretch>0</verstretch>
-           </sizepolicy>
-          </property>
           <property name="minimumSize">
            <size>
             <width>24</width>
@@ -594,11 +600,82 @@ QTreeView::branch:open:has-children:has-siblings  {
           <property name="maximumSize">
            <size>
             <width>24</width>
-            <height>24</height>
+            <height>16777215</height>
            </size>
           </property>
           <property name="text">
            <string/>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignCenter</set>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="sync_button">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>14</height>
+           </size>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>16777215</width>
+            <height>35</height>
+           </size>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">QPushButton#sync_button {
+	min-height: 0px;
+	border: 1px solid #0099FF; 
+	border-radius: 3px;
+	color: rgb(230, 230, 230);
+	font-size: 14pt;
+	padding: 6px;
+}
+
+QPushButton#sync_button::pressed {
+	background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, stop:0 rgba(59, 59, 59, 255), stop:0.5 rgba(82, 82, 82, 255), stop:1 rgba(68, 68, 68, 255));
+	color: #0099FF;
+}</string>
+          </property>
+          <property name="text">
+           <string>SYNC NOW</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="sync_label">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>30</height>
+           </size>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>16777215</width>
+            <height>35</height>
+           </size>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">color: white; font-size: 14pt; padding-left: 6px; padding-right: 6px; border: 1px solid #0099FF; border-radius: 3px;</string>
+          </property>
+          <property name="text">
+           <string>SYNCHRONIZING</string>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignCenter</set>
+          </property>
+          <property name="wordWrap">
+           <bool>true</bool>
           </property>
          </widget>
         </item>
