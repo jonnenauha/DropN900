@@ -474,7 +474,7 @@ class AboutDialog(QDialog):
         topics.append(label)        
         self.layout().addWidget(label, 0, 0, Qt.AlignRight)
         
-        label = QLabel("0.1.5")
+        label = QLabel("0.1.8")
         self.layout().addWidget(label, 0, 1)
                 
         label = QLabel("Made by")

@@ -1,3 +1,7 @@
+dropn900-0.1.8-1 - 
+* Upload N900 camera folder content to dropbox path /N900Media
+* Confirmation options to sync both videos and photos or just photos or videos
+
 dropn900-0.1.6-1 - 24.10.2010
 * Separate confirm dialogs for upload and download
 * Options in confirmation dialogs: Download/Upload Files, Cancel, Ignore Files and for upload dialog Delete Local Files.

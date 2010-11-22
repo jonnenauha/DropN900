@@ -72,46 +72,150 @@ class SyncManager(QObject):
             del self.active_metadata_thread
             self.active_metadata_thread = None
             self.check_metadata_queue()
-                    
-    def sync_now(self, sync_path):
+            
+    def can_sync(self, path):
         if self.connection.client == None:
             self.ui.show_banner("Cannot synchronize, not connected to Dropbox")
             self.logger.sync("Cannot synchronize, no network connection")
-            return
+            return False
         if self.connection.connection_available() == False:
             self.ui.show_banner("Cannot synchronize, no network connection")
             self.logger.sync("Cannot synchronize, no network connection")
-            return
+            return False
         if self.datahandler.only_sync_on_wlan:
             if not self.connection.connection_is_wlan():
                 self.ui.show_banner("Synchronizing without WLAN disabled in settings", 4000)
-                return
+                return False
         if len(self.controller.transfer_manager.queued_transfer_threads) > 0 or self.controller.transfer_manager.active_transfer != None:
             self.ui.show_banner("There are ongoing active transfers\nPlease wait for them to complete")
-            return    
+            return False    
         if len(self.connection.data_workers) > 0:
             self.ui.show_banner("Data is still being written from previous downloads\nPlease wait a moment and try synchronizing again", 5000)
-            return
+            return False
         if self.sync_ongoing:
             self.ui.show_banner("Synchronization already in progress")
             self.logger.sync("Synchronizing already in progress")
-            return
+            return False
         if sync_path == "" or sync_path == "/":
             self.ui.show_banner("Cannot synchronize, path / invalid")
             self.logger.sync("Cannot synchronize, path / invalid")
-            return
+            return False
         if sync_path == "None":
             self.ui.show_banner("Synchronizing disabled in settings", 2000)
-            return 
+            return False 
         if sync_path[0] != "/":
             self.ui.show_banner("Cannot synchronize, path '" + sync_path + "' invalid")
             self.logger.sync("Cannot synchronize, path '" + sync_path + "' invalid")
-            return
+            return False
         dir_check = QDir(self.datahandler.get_data_dir_path())
         if not dir_check.exists():
             self.ui.show_note("Cannot synchronize, download dir " + self.datahandler.get_data_dir_path() + " does not exist. Please set a new folder in settings.")
+            return False
+        # If got this far, we should be ok to sync
+        return True
+            
+    def sync_images(self):
+        path_local = self.datahandler.user_home + "/MyDocs/DCIM"
+        path_remote = "/Photos"
+        if not self.can_sync(path_remote):
             return
+        
+        self.ui.show_banner("Preparing photo synchronization, please wait...", 2000)
+        self.ui.set_synching(True)
+        
+        print "Fetching metadata for Photos folder..."
+        response = self.connection.client.metadata("dropbox", path_remote, 10000, None)
+        print "Response:", response.status        
+        if response.status != 200:
+            print "Error fetching destination metadata"
+            self.ui.set_synching(False)
+            return
+            
+        data_photos = self.connection.data_parser.parse_metadata(response.data, None)
+        remote_files_obj = data.get_files()
+        remote_files = []
+        for file_obj in remote_files_obj:
+            remote_files.append(file_obj.get_name())
+        print "Remote files:", remote_files
+        
+        sending_local_files = {}
+        for filename in os.listdir(path_local):
+            full_path = path_local + "/" + filename
+            if os.path.isdir(full_path):
+                continue
+            try:
+                found = remote_files[filename]
+            except IndexError:
+                print "File", filename, "not found from remote"
+                sending_local_files[filename] = full_path
+                
+        if len(sending_local_files) == 0:
+            print "All photos/videos up to date"
+            return
+            
+        videos = {}
+        videos_size = 0
+        images = {}
+        images_size = 0
+        for (name, path) in sending_local_files.iteritems():
+            ext = name.split(".")[-1]
+            if ext == "mp4":
+                videos[name] = path
+                videos_size += os.path.getsize(path)
+            else:
+                images[name] = path
+                images_size += os.path.getsize(path)
+        
+        confirmation_ul = SyncDialog(self.ui.main_widget)    
+        confirmation_ul.setWindowTitle("Camera Photos Upload Confirmation")
+        button_ul_all = confirmation_ul.addButton("Upload All", QMessageBox.YesRole)
+        button_ul_photos = confirmation_ul.addButton("Upload Photos", QMessageBox.ActionRole)
+        button_ul_videos = confirmation_ul.addButton("Upload Videos", QMessageBox.DestructiveRole)
+        button_ul_cancel = confirmation_ul.addButton("Cancel", QMessageBox.NoRole)
+        
+        confirmation_ul.add_titles(" ", "Files", "Size")
+        confirmation_ul.add_row("Photos", len(images), self.datahandler.humanize_bytes(images_size))
+        confirmation_ul.add_row("Videos", len(videos), self.datahandler.humanize_bytes(videos_size))
+        confirmation_ul.add_totals(" ", str(len(images)+len(videos)), self.datahandler.humanize_bytes(images_size+videos_size))
+        confirmation_ul.finalize()
+                
+        # Photo UL dialog: Upload All = 0, Upload Photos = 1, Cancel = 2, Upload Videos = 3
+        upload_map = {}
+        upload_bytes = 0
+        result = confirmation_ul.exec_()
+            if result == 2:
+                print "Canceled"
+                return
+            elif result == 0:
+                print "Upload All"
+                upload_map = images + videos
+                upload_bytes = images_size + videos_size
+            elif results == 1:
+                print "Upload Photos"
+                upload_map = images
+                upload_bytes = images_size
+            elif result == 3:
+                print "Upload Videos"
+                upload_map = videos
+                upload_bytes = videos_size
+                
+        sync_widget = SyncTransferItem(self)
+        sync_widget.set_totals(0, len(upload_map))
+        sync_widget.set_sizes("0", self.datahandler.humanize_bytes(upload_bytes))
+        sync_widget.ui.dl_size.hide()
+        self.controller.transfer_manager.set_current_sync(sync_widget)
+        self.controller.transfer_widget.add_sync_reporting(sync_widget)
+        
+        for (name, path) in upload_map.iteritems():
+            self.connection.upload_file(path_remote, "dropbox", path, True)
 
+        self.ui.set_synching(False)
+        self.ui.show_transfer_widget()
+                
+    def sync_now(self, sync_path):
+        if not self.can_sync(sync_path):
+            return
+            
         self.sync_ongoing = True
         self.sync_fetching_sync_root = True
         self.sync_root = None
