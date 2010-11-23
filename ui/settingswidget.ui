@@ -13,6 +13,12 @@
   <property name="windowTitle">
    <string>DropN900 - Settings</string>
   </property>
+  <property name="styleSheet">
+   <string notr="true">QLineEdit {
+	background-color: white;
+	color: black;
+}</string>
+  </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <property name="spacing">
     <number>0</number>
@@ -35,9 +41,9 @@
       <property name="geometry">
        <rect>
         <x>0</x>
-        <y>-474</y>
-        <width>988</width>
-        <height>967</height>
+        <y>0</y>
+        <width>991</width>
+        <height>963</height>
        </rect>
       </property>
       <property name="sizePolicy">

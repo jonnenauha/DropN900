@@ -73,7 +73,7 @@ class SyncManager(QObject):
             self.active_metadata_thread = None
             self.check_metadata_queue()
             
-    def can_sync(self, path):
+    def can_sync(self, sync_path):
         if self.connection.client == None:
             self.ui.show_banner("Cannot synchronize, not connected to Dropbox")
             self.logger.sync("Cannot synchronize, no network connection")
@@ -114,43 +114,118 @@ class SyncManager(QObject):
         # If got this far, we should be ok to sync
         return True
             
-    def sync_images(self):
+    def sync_media(self):
         path_local = self.datahandler.user_home + "/MyDocs/DCIM"
-        path_remote = "/Photos"
-        if not self.can_sync(path_remote):
+        remote_paths = []
+        path_remote_base = "/N900Media"
+        path_remote_images = "/N900Media/Photos"
+        path_remote_videos = "/N900Media/Videos"
+        remote_paths.append(path_remote_base)
+        remote_paths.append(path_remote_images)
+        remote_paths.append(path_remote_videos)
+        if not self.can_sync(path_remote_base):
             return
-        
-        self.ui.show_banner("Preparing photo synchronization, please wait...", 2000)
+            
+        # Local check
+        if not QDir(path_local).exists():
+            self.logger.sync_error("Could not verify media location from " + path_local)
+            self.ui.show_banner("Errors occurred, check log", 2000)
+            return
+            
+        # Remote base folder check
+        response_images = None
+        response_videos = None
+        response = self.connection.client.metadata("dropbox", path_remote_base, 10000, None)
+        if response.status == 404:
+            answer = QMessageBox.question(self.ui.main_widget, " ", 
+            "You need to create media folders /N900Media/Photos and /N900Media/Videos to dropbox to proceed. \n\nDo you wish to Continue?", QMessageBox.Yes, QMessageBox.No)
+            if answer == QMessageBox.No:
+                return
+                
+            # Create all base, videos and images folder
+            for remote_path in remote_paths:
+                if self.connection.create_folder_blocking(remote_path):
+                    self.logger.info("Created remote folder " + remote_path + " succesfully")
+                else:
+                    self.logger.info("Failed to create remote folder " + remote_path + ", aborting media sync")
+                    self.ui.show_banner("Errors occurred, check log", 2000)
+                    return
+        else:
+            self.ui.show_banner("Preparing media synchronization, please wait...", 2000)
+            # Check images
+            response_images = self.connection.client.metadata("dropbox", path_remote_images, 10000, None)
+            if response_images.status == 404:
+                response_images = None
+                answer = QMessageBox.question(self.ui.main_widget, " ", "You need to create media folder /N900Media/Photos to dropbox to proceed. \n\nDo you wish to Continue?", QMessageBox.Yes, QMessageBox.No)
+                if answer == QMessageBox.No:
+                    return
+                    
+                if self.connection.create_folder_blocking(path_remote_images):
+                    self.logger.info("Created remote folder " + path_remote_images + " succesfully")
+                else:
+                    self.logger.info("Failed to create remote folder " + path_remote_images + ", aborting media sync")
+                    self.ui.show_banner("Errors occurred, check log", 2000)
+                    return
+            # Check videos
+            response_videos = self.connection.client.metadata("dropbox", path_remote_videos, 10000, None)
+            if response_videos.status == 404:
+                response_videos = None
+                answer = QMessageBox.question(self.ui.main_widget, " ", "You need to create media folder /N900Media/Videos to dropbox to proceed. \n\nDo you wish to Continue?", QMessageBox.Yes, QMessageBox.No)
+                if answer == QMessageBox.No:
+                    return
+                    
+                if self.connection.create_folder_blocking(path_remote_videos):
+                    self.logger.info("Created remote folder " + path_remote_videos + " succesfully")
+                else:
+                    self.logger.info("Failed to create remote folder " + path_remote_videos + ", aborting media sync")
+                    self.ui.show_banner("Errors occurred, check log", 2000)
+                    return      
+                    
+        # Folder checks ok, lets sync
         self.ui.set_synching(True)
         
-        print "Fetching metadata for Photos folder..."
-        response = self.connection.client.metadata("dropbox", path_remote, 10000, None)
-        print "Response:", response.status        
-        if response.status != 200:
-            print "Error fetching destination metadata"
+        # Get metadata for both destinations if still needed
+        if response_images == None:
+            response_images = self.connection.client.metadata("dropbox", path_remote_images, 10000, None)
+        if response_videos == None:
+            response_videos = self.connection.client.metadata("dropbox", path_remote_videos, 10000, None)
+            
+        if response_images.status != 200 or response_videos.status != 200:
+            self.logger.sync_error("Error fetching media photos and videos metadata")
+            self.ui.show_banner("Errors occurred, check log", 2000)
             self.ui.set_synching(False)
             return
             
-        data_photos = self.connection.data_parser.parse_metadata(response.data, None)
-        remote_files_obj = data.get_files()
+        # Parse metadatas to get remote file lists
+        data_photos = self.connection.data_parser.parse_metadata_static(response_images.data)
+        data_videos = self.connection.data_parser.parse_metadata_static(response_videos.data)
+        if data_photos == None or data_videos == None:
+            self.logger.sync_error("Error fetching media photos and videos metadata")
+            self.ui.show_banner("Errors occurred, check log", 2000)
+            self.ui.set_synching(False)
+            return
+          
+        # Round up files      
         remote_files = []
-        for file_obj in remote_files_obj:
+        for file_obj in data_photos.get_files():
             remote_files.append(file_obj.get_name())
-        print "Remote files:", remote_files
+        for file_obj in data_videos.get_files():
+            remote_files.append(file_obj.get_name())
         
+        # Check local folder and compare to remote files
         sending_local_files = {}
         for filename in os.listdir(path_local):
             full_path = path_local + "/" + filename
             if os.path.isdir(full_path):
                 continue
             try:
-                found = remote_files[filename]
-            except IndexError:
-                print "File", filename, "not found from remote"
+                found = remote_files.index(filename)
+            except ValueError:
                 sending_local_files[filename] = full_path
                 
         if len(sending_local_files) == 0:
-            print "All photos/videos up to date"
+            self.ui.show_banner("All media up to date, nothing to upload", 4000)
+            self.ui.set_synching(False)
             return
             
         videos = {}
@@ -174,41 +249,52 @@ class SyncManager(QObject):
         button_ul_cancel = confirmation_ul.addButton("Cancel", QMessageBox.NoRole)
         
         confirmation_ul.add_titles(" ", "Files", "Size")
-        confirmation_ul.add_row("Photos", len(images), self.datahandler.humanize_bytes(images_size))
-        confirmation_ul.add_row("Videos", len(videos), self.datahandler.humanize_bytes(videos_size))
+        confirmation_ul.add_row("Photos", str(len(images)), self.datahandler.humanize_bytes(images_size))
+        confirmation_ul.add_row("Videos", str(len(videos)), self.datahandler.humanize_bytes(videos_size))
         confirmation_ul.add_totals(" ", str(len(images)+len(videos)), self.datahandler.humanize_bytes(images_size+videos_size))
         confirmation_ul.finalize()
-                
-        # Photo UL dialog: Upload All = 0, Upload Photos = 1, Cancel = 2, Upload Videos = 3
-        upload_map = {}
+        
+        if len(images) == 0:
+            button_ul_photos.setEnabled(False)
+        if len(videos) == 0:
+            button_ul_videos.setEnabled(False)
+
+        # Photo UL dialog: Upload All = 0, Upload Photos = 1, Cancel = 3, Upload Videos = 2
+        send_photos = False
+        send_videos = False
+        upload_files = 0
         upload_bytes = 0
         result = confirmation_ul.exec_()
-            if result == 2:
-                print "Canceled"
-                return
-            elif result == 0:
-                print "Upload All"
-                upload_map = images + videos
-                upload_bytes = images_size + videos_size
-            elif results == 1:
-                print "Upload Photos"
-                upload_map = images
-                upload_bytes = images_size
-            elif result == 3:
-                print "Upload Videos"
-                upload_map = videos
-                upload_bytes = videos_size
-                
+        if result == 3:
+            return
+        elif result == 0:
+            send_photos = True
+            send_videos = True
+            upload_files = len(images) + len(videos)
+            upload_bytes = images_size + videos_size
+        elif result == 1:
+            send_photos = True
+            upload_files = len(images)
+            upload_bytes = images_size
+        elif result == 2:
+            send_videos = True
+            upload_files = len(videos)
+            upload_bytes = videos_size
+
         sync_widget = SyncTransferItem(self)
-        sync_widget.set_totals(0, len(upload_map))
+        sync_widget.set_totals(0, upload_files)
         sync_widget.set_sizes("0", self.datahandler.humanize_bytes(upload_bytes))
         sync_widget.ui.dl_size.hide()
         self.controller.transfer_manager.set_current_sync(sync_widget)
         self.controller.transfer_widget.add_sync_reporting(sync_widget)
         
-        for (name, path) in upload_map.iteritems():
-            self.connection.upload_file(path_remote, "dropbox", path, True)
-
+        if send_photos:
+            for (name, path) in images.iteritems():
+                self.connection.upload_file(path_remote_images, "dropbox", path, True)
+        if send_videos:
+            for (name, path) in videos.iteritems():
+                self.connection.upload_file(path_remote_videos, "dropbox", path, True)
+                
         self.ui.set_synching(False)
         self.ui.show_transfer_widget()
                 

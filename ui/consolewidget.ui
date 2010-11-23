@@ -14,7 +14,7 @@
    <string>DropN900 - Log</string>
   </property>
   <property name="styleSheet">
-   <string>QWidget#ConsoleWidget {
+   <string notr="true">QWidget#ConsoleWidget {
 	background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, stop:0 rgba(6, 6, 6, 255), stop:1 rgba(45, 45, 45, 255));
 }
 
@@ -28,6 +28,7 @@ QPlainTextEdit#text_area {
 	background-color: white;
 	border: 2px solid rgba(255,255,255,200);
 	border-radius: 10px;
+	color: black;
 }
 
 QPushButton {

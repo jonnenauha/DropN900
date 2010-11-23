@@ -2,8 +2,8 @@
 
 # Form implementation generated from reading ui file 'consolewidget.ui'
 #
-# Created: Sat Jul 31 00:50:58 2010
-#      by: PyQt4 UI code generator 4.6
+# Created: Tue Nov 23 03:26:38 2010
+#      by: PyQt4 UI code generator 4.7.2
 #
 # WARNING! All changes made in this file will be lost!
 
@@ -13,46 +13,7 @@ class Ui_ConsoleWidget(object):
     def setupUi(self, ConsoleWidget):
         ConsoleWidget.setObjectName("ConsoleWidget")
         ConsoleWidget.resize(563, 343)
-        self.verticalLayout = QtGui.QVBoxLayout(ConsoleWidget)
-        self.verticalLayout.setSpacing(10)
-        self.verticalLayout.setMargin(10)
-        self.verticalLayout.setObjectName("verticalLayout")
-        self.text_area = QtGui.QPlainTextEdit(ConsoleWidget)
-        font = QtGui.QFont()
-        font.setFamily("FreeMono")
-        font.setPointSize(12)
-        self.text_area.setFont(font)
-        self.text_area.setObjectName("text_area")
-        self.verticalLayout.addWidget(self.text_area)
-        self.horizontalLayout = QtGui.QHBoxLayout()
-        self.horizontalLayout.setSpacing(0)
-        self.horizontalLayout.setObjectName("horizontalLayout")
-        self.button_save = QtGui.QPushButton(ConsoleWidget)
-        font = QtGui.QFont()
-        font.setPointSize(19)
-        font.setWeight(50)
-        font.setItalic(False)
-        font.setBold(False)
-        self.button_save.setFont(font)
-        self.button_save.setObjectName("button_save")
-        self.horizontalLayout.addWidget(self.button_save)
-        self.button_back = QtGui.QPushButton(ConsoleWidget)
-        font = QtGui.QFont()
-        font.setPointSize(19)
-        font.setWeight(50)
-        font.setItalic(False)
-        font.setBold(False)
-        self.button_back.setFont(font)
-        self.button_back.setObjectName("button_back")
-        self.horizontalLayout.addWidget(self.button_back)
-        self.verticalLayout.addLayout(self.horizontalLayout)
-
-        self.retranslateUi(ConsoleWidget)
-        QtCore.QMetaObject.connectSlotsByName(ConsoleWidget)
-
-    def retranslateUi(self, ConsoleWidget):
-        ConsoleWidget.setWindowTitle(QtGui.QApplication.translate("ConsoleWidget", "DropN900 - Log", None, QtGui.QApplication.UnicodeUTF8))
-        ConsoleWidget.setStyleSheet(QtGui.QApplication.translate("ConsoleWidget", "QWidget#ConsoleWidget {\n"
+        ConsoleWidget.setStyleSheet("QWidget#ConsoleWidget {\n"
 "    background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, stop:0 rgba(6, 6, 6, 255), stop:1 rgba(45, 45, 45, 255));\n"
 "}\n"
 "\n"
@@ -66,6 +27,7 @@ class Ui_ConsoleWidget(object):
 "    background-color: white;\n"
 "    border: 2px solid rgba(255,255,255,200);\n"
 "    border-radius: 10px;\n"
+"    color: black;\n"
 "}\n"
 "\n"
 "QPushButton {\n"
@@ -96,7 +58,47 @@ class Ui_ConsoleWidget(object):
 "QPushButton:pressed {\n"
 "    background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, stop:0 rgba(59, 59, 59, 255), stop:0.5 rgba(82, 82, 82, 255), stop:1 rgba(68, 68, 68, 255));\n"
 "    color: #0099FF;\n"
-"}", None, QtGui.QApplication.UnicodeUTF8))
+"}")
+        self.verticalLayout = QtGui.QVBoxLayout(ConsoleWidget)
+        self.verticalLayout.setSpacing(10)
+        self.verticalLayout.setMargin(10)
+        self.verticalLayout.setObjectName("verticalLayout")
+        self.text_area = QtGui.QPlainTextEdit(ConsoleWidget)
+        font = QtGui.QFont()
+        font.setFamily("FreeMono")
+        font.setPointSize(12)
+        self.text_area.setFont(font)
+        self.text_area.setPlainText("")
+        self.text_area.setObjectName("text_area")
+        self.verticalLayout.addWidget(self.text_area)
+        self.horizontalLayout = QtGui.QHBoxLayout()
+        self.horizontalLayout.setSpacing(0)
+        self.horizontalLayout.setObjectName("horizontalLayout")
+        self.button_save = QtGui.QPushButton(ConsoleWidget)
+        font = QtGui.QFont()
+        font.setPointSize(19)
+        font.setWeight(50)
+        font.setItalic(False)
+        font.setBold(False)
+        self.button_save.setFont(font)
+        self.button_save.setObjectName("button_save")
+        self.horizontalLayout.addWidget(self.button_save)
+        self.button_back = QtGui.QPushButton(ConsoleWidget)
+        font = QtGui.QFont()
+        font.setPointSize(19)
+        font.setWeight(50)
+        font.setItalic(False)
+        font.setBold(False)
+        self.button_back.setFont(font)
+        self.button_back.setObjectName("button_back")
+        self.horizontalLayout.addWidget(self.button_back)
+        self.verticalLayout.addLayout(self.horizontalLayout)
+
+        self.retranslateUi(ConsoleWidget)
+        QtCore.QMetaObject.connectSlotsByName(ConsoleWidget)
+
+    def retranslateUi(self, ConsoleWidget):
+        ConsoleWidget.setWindowTitle(QtGui.QApplication.translate("ConsoleWidget", "DropN900 - Log", None, QtGui.QApplication.UnicodeUTF8))
         self.button_save.setText(QtGui.QApplication.translate("ConsoleWidget", "SAVE LOG TO FILE", None, QtGui.QApplication.UnicodeUTF8))
         self.button_back.setText(QtGui.QApplication.translate("ConsoleWidget", "RETURN", None, QtGui.QApplication.UnicodeUTF8))
 

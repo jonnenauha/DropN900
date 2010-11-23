@@ -78,7 +78,6 @@ class ConfigHelper:
             print "DropN900 config is missing a settings:", e
         except ValueError:
             self.write_default_settings()
-
         
     def write_default_settings(self, force_dl_folder = False):
         download_data = {}
@@ -197,6 +196,7 @@ class SettingsWidget(QMainWindow):
         self.sync_path_button.setPickSelector(self.sync_path_pick_selector)
         
         self.ui.sync_buttons_layout.insertWidget(0, self.sync_path_button)
+        self.sync_path_button.setStyleSheet("color:white; QPushbutton { color:white; }")
 
         # Get initial settings and set to ui
         init_settings = self.config_helper.get_current_settings()

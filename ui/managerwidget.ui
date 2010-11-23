@@ -6,15 +6,9 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
-    <height>474</height>
+    <width>923</width>
+    <height>532</height>
    </rect>
-  </property>
-  <property name="maximumSize">
-   <size>
-    <width>800</width>
-    <height>16777215</height>
-   </size>
   </property>
   <property name="windowTitle">
    <string>ManagerWidget</string>
@@ -39,7 +33,7 @@ QPushButton {
 	border-left: 0px;
 	color: rgb(230, 230, 230);
 	background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, stop:0 rgba(16, 16, 16, 255), stop:0.5 rgba(55, 55, 55, 210), stop:1 rgba(36, 36, 36, 255));
-	font-size: 16pt;
+	font-size: 15pt;
 }
 
 QPushButton:hover {
@@ -82,14 +76,12 @@ QPushButton#button_rename {
 QTreeWidget {
 	show-decoration-selected: 1;
 	background-color: black;
-	alternate-background-color: rgb(36, 36, 36);
 	color: rgb(235, 235, 235);
-	font-size: 15pt;
+	font-size: 13pt;
 	border: 0px;
 	border-bottom: 2px solid rgba(255,255,255,200);
 	border-right: 2px solid rgba(255,255,255,200);
 	border-top: 2px solid rgba(255,255,255,200);
-	border-bottom-right-radius: 15px;
 	padding-bottom: 15px;
 }
 
@@ -146,7 +138,8 @@ QTreeView::branch:open:has-children:!has-siblings {
 QTreeView::branch:open:has-children:has-siblings  {
 	border-image: url(/opt/dropn900/ui/images/vline-cap.png) 0;
 	image: url(/opt/dropn900/ui/images/arrow_down_small.png);
-}</string>
+}
+</string>
   </property>
   <layout class="QHBoxLayout" name="horizontalLayout_2">
    <property name="spacing">
@@ -167,12 +160,6 @@ QTreeView::branch:open:has-children:has-siblings  {
        </property>
        <item>
         <widget class="QTreeWidget" name="tree_widget">
-         <property name="maximumSize">
-          <size>
-           <width>500</width>
-           <height>16777215</height>
-          </size>
-         </property>
          <property name="frameShape">
           <enum>QFrame::StyledPanel</enum>
          </property>
@@ -182,35 +169,20 @@ QTreeView::branch:open:has-children:has-siblings  {
          <property name="lineWidth">
           <number>1</number>
          </property>
-         <property name="alternatingRowColors">
-          <bool>true</bool>
-         </property>
-         <property name="indentation">
-          <number>25</number>
-         </property>
-         <property name="uniformRowHeights">
+         <property name="rootIsDecorated">
           <bool>true</bool>
          </property>
          <property name="animated">
           <bool>true</bool>
          </property>
-         <attribute name="headerVisible">
+         <property name="headerHidden">
+          <bool>false</bool>
+         </property>
+         <attribute name="headerStretchLastSection">
           <bool>true</bool>
          </attribute>
-         <attribute name="headerDefaultSectionSize">
-          <number>380</number>
-         </attribute>
-         <attribute name="headerMinimumSectionSize">
-          <number>40</number>
-         </attribute>
-         <attribute name="headerDefaultSectionSize">
-          <number>380</number>
-         </attribute>
-         <attribute name="headerVisible">
+         <attribute name="headerStretchLastSection">
           <bool>true</bool>
-         </attribute>
-         <attribute name="headerMinimumSectionSize">
-          <number>40</number>
          </attribute>
          <column>
           <property name="text">
@@ -335,12 +307,6 @@ QTreeView::branch:open:has-children:has-siblings  {
    </item>
    <item>
     <widget class="QFrame" name="frame_controls_right">
-     <property name="minimumSize">
-      <size>
-       <width>300</width>
-       <height>0</height>
-      </size>
-     </property>
      <property name="maximumSize">
       <size>
        <width>275</width>
@@ -373,7 +339,7 @@ QTreeView::branch:open:has-children:has-siblings  {
        <widget class="QPushButton" name="button_download">
         <property name="font">
          <font>
-          <pointsize>16</pointsize>
+          <pointsize>15</pointsize>
          </font>
         </property>
         <property name="styleSheet">
@@ -393,7 +359,7 @@ QTreeView::branch:open:has-children:has-siblings  {
          <widget class="QPushButton" name="button_remove">
           <property name="font">
            <font>
-            <pointsize>16</pointsize>
+            <pointsize>15</pointsize>
            </font>
           </property>
           <property name="text">
@@ -405,7 +371,7 @@ QTreeView::branch:open:has-children:has-siblings  {
          <widget class="QPushButton" name="button_rename">
           <property name="font">
            <font>
-            <pointsize>16</pointsize>
+            <pointsize>15</pointsize>
            </font>
           </property>
           <property name="text">
@@ -419,7 +385,7 @@ QTreeView::branch:open:has-children:has-siblings  {
        <widget class="QPushButton" name="button_upload">
         <property name="font">
          <font>
-          <pointsize>16</pointsize>
+          <pointsize>15</pointsize>
          </font>
         </property>
         <property name="text">
@@ -431,7 +397,7 @@ QTreeView::branch:open:has-children:has-siblings  {
        <widget class="QPushButton" name="button_new_folder">
         <property name="font">
          <font>
-          <pointsize>16</pointsize>
+          <pointsize>15</pointsize>
          </font>
         </property>
         <property name="text">
@@ -443,7 +409,7 @@ QTreeView::branch:open:has-children:has-siblings  {
        <widget class="QPushButton" name="button_copy_public_link">
         <property name="minimumSize">
          <size>
-          <width>70</width>
+          <width>0</width>
           <height>62</height>
          </size>
         </property>
@@ -456,7 +422,7 @@ QTreeView::branch:open:has-children:has-siblings  {
        <widget class="QPushButton" name="button_open_public_link">
         <property name="font">
          <font>
-          <pointsize>16</pointsize>
+          <pointsize>15</pointsize>
          </font>
         </property>
         <property name="text">

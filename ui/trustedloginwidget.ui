@@ -14,7 +14,7 @@
    <string>TrustedLoginWidget</string>
   </property>
   <property name="styleSheet">
-   <string>QWidget#TrustedLoginWidget {
+   <string notr="true">QWidget#TrustedLoginWidget {
 	background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, stop:0 rgba(6, 6, 6, 255), stop:1 rgba(45, 45, 45, 255));
 }
 
@@ -23,6 +23,8 @@ QLineEdit {
 	border-radius: 7px;
 	padding: 5px;
 	font-size: 19pt;
+	background-color: white;
+	color: black;
 }
 
 QLabel {

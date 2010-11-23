@@ -19,7 +19,32 @@ class DataParser:
         self.controller = ui_handler.controller
         self.logger = logger
         self.uid = None
+        
+    def parse_metadata_static(self, data):
+        folder = None
+        if data == None:
+            return folder
+        if not data["is_dir"]:
+            return folder
+            
+        # Create new data folder
+        parent_root = data["root"]
+        folder = Collection(data["path"], "", data["icon"], data["thumb_exists"], parent_root, data["hash"])
 
+        # Add children to folder
+        for item in data["contents"]:
+            path = item["path"]
+            size = item["size"]
+            modified = item["modified"]
+            icon = item["icon"]
+            has_thumb = item["thumb_exists"]
+            if item["is_dir"]:
+                child = Collection(path, modified, icon, has_thumb, parent_root)
+            else:
+                child = Resource(path, size, item["bytes"], modified, item["mime_type"], icon, has_thumb, parent_root)
+            folder.add_item(child)
+        return folder
+        
     def parse_metadata(self, data, opened_folders):
         tree_item = None
         if data == None:

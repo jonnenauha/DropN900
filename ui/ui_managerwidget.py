@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'managerwidget.ui'
 #
-# Created: Sun Oct 24 22:18:58 2010
+# Created: Tue Nov 23 03:29:14 2010
 #      by: PyQt4 UI code generator 4.7.2
 #
 # WARNING! All changes made in this file will be lost!
@@ -12,8 +12,7 @@ from PyQt4 import QtCore, QtGui
 class Ui_ManagerWidget(object):
     def setupUi(self, ManagerWidget):
         ManagerWidget.setObjectName("ManagerWidget")
-        ManagerWidget.resize(800, 474)
-        ManagerWidget.setMaximumSize(QtCore.QSize(800, 16777215))
+        ManagerWidget.resize(923, 532)
         ManagerWidget.setStyleSheet("QFrame#frame_controls_bottom, #frame_controls_right {\n"
 "    background: black;\n"
 "}\n"
@@ -33,7 +32,7 @@ class Ui_ManagerWidget(object):
 "    border-left: 0px;\n"
 "    color: rgb(230, 230, 230);\n"
 "    background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, stop:0 rgba(16, 16, 16, 255), stop:0.5 rgba(55, 55, 55, 210), stop:1 rgba(36, 36, 36, 255));\n"
-"    font-size: 16pt;\n"
+"    font-size: 15pt;\n"
 "}\n"
 "\n"
 "QPushButton:hover {\n"
@@ -76,14 +75,12 @@ class Ui_ManagerWidget(object):
 "QTreeWidget {\n"
 "    show-decoration-selected: 1;\n"
 "    background-color: black;\n"
-"    alternate-background-color: rgb(36, 36, 36);\n"
 "    color: rgb(235, 235, 235);\n"
-"    font-size: 15pt;\n"
+"    font-size: 13pt;\n"
 "    border: 0px;\n"
 "    border-bottom: 2px solid rgba(255,255,255,200);\n"
 "    border-right: 2px solid rgba(255,255,255,200);\n"
 "    border-top: 2px solid rgba(255,255,255,200);\n"
-"    border-bottom-right-radius: 15px;\n"
 "    padding-bottom: 15px;\n"
 "}\n"
 "\n"
@@ -140,7 +137,8 @@ class Ui_ManagerWidget(object):
 "QTreeView::branch:open:has-children:has-siblings  {\n"
 "    border-image: url(/opt/dropn900/ui/images/vline-cap.png) 0;\n"
 "    image: url(/opt/dropn900/ui/images/arrow_down_small.png);\n"
-"}")
+"}\n"
+"")
         self.horizontalLayout_2 = QtGui.QHBoxLayout(ManagerWidget)
         self.horizontalLayout_2.setSpacing(0)
         self.horizontalLayout_2.setMargin(0)
@@ -152,18 +150,14 @@ class Ui_ManagerWidget(object):
         self.verticalLayout.setSpacing(0)
         self.verticalLayout.setObjectName("verticalLayout")
         self.tree_widget = QtGui.QTreeWidget(ManagerWidget)
-        self.tree_widget.setMaximumSize(QtCore.QSize(500, 16777215))
         self.tree_widget.setFrameShape(QtGui.QFrame.StyledPanel)
         self.tree_widget.setFrameShadow(QtGui.QFrame.Sunken)
         self.tree_widget.setLineWidth(1)
-        self.tree_widget.setAlternatingRowColors(True)
-        self.tree_widget.setIndentation(25)
-        self.tree_widget.setUniformRowHeights(True)
+        self.tree_widget.setRootIsDecorated(True)
         self.tree_widget.setAnimated(True)
+        self.tree_widget.setHeaderHidden(False)
         self.tree_widget.setObjectName("tree_widget")
-        self.tree_widget.header().setVisible(True)
-        self.tree_widget.header().setDefaultSectionSize(380)
-        self.tree_widget.header().setMinimumSectionSize(40)
+        self.tree_widget.header().setStretchLastSection(True)
         self.verticalLayout.addWidget(self.tree_widget)
         self.frame_controls_bottom = QtGui.QFrame(ManagerWidget)
         self.frame_controls_bottom.setFrameShape(QtGui.QFrame.NoFrame)
@@ -211,7 +205,6 @@ class Ui_ManagerWidget(object):
         self.horizontalLayout.addLayout(self.verticalLayout)
         self.horizontalLayout_2.addLayout(self.horizontalLayout)
         self.frame_controls_right = QtGui.QFrame(ManagerWidget)
-        self.frame_controls_right.setMinimumSize(QtCore.QSize(300, 0))
         self.frame_controls_right.setMaximumSize(QtCore.QSize(275, 16777215))
         self.frame_controls_right.setFrameShape(QtGui.QFrame.NoFrame)
         self.frame_controls_right.setLineWidth(0)
@@ -222,7 +215,7 @@ class Ui_ManagerWidget(object):
         self.verticalLayout_2.setObjectName("verticalLayout_2")
         self.button_download = QtGui.QPushButton(self.frame_controls_right)
         font = QtGui.QFont()
-        font.setPointSize(16)
+        font.setPointSize(15)
         self.button_download.setFont(font)
         self.button_download.setStyleSheet("None")
         self.button_download.setObjectName("button_download")
@@ -232,36 +225,36 @@ class Ui_ManagerWidget(object):
         self.layout_buttons.setObjectName("layout_buttons")
         self.button_remove = QtGui.QPushButton(self.frame_controls_right)
         font = QtGui.QFont()
-        font.setPointSize(16)
+        font.setPointSize(15)
         self.button_remove.setFont(font)
         self.button_remove.setObjectName("button_remove")
         self.layout_buttons.addWidget(self.button_remove)
         self.button_rename = QtGui.QPushButton(self.frame_controls_right)
         font = QtGui.QFont()
-        font.setPointSize(16)
+        font.setPointSize(15)
         self.button_rename.setFont(font)
         self.button_rename.setObjectName("button_rename")
         self.layout_buttons.addWidget(self.button_rename)
         self.verticalLayout_2.addLayout(self.layout_buttons)
         self.button_upload = QtGui.QPushButton(self.frame_controls_right)
         font = QtGui.QFont()
-        font.setPointSize(16)
+        font.setPointSize(15)
         self.button_upload.setFont(font)
         self.button_upload.setObjectName("button_upload")
         self.verticalLayout_2.addWidget(self.button_upload)
         self.button_new_folder = QtGui.QPushButton(self.frame_controls_right)
         font = QtGui.QFont()
-        font.setPointSize(16)
+        font.setPointSize(15)
         self.button_new_folder.setFont(font)
         self.button_new_folder.setObjectName("button_new_folder")
         self.verticalLayout_2.addWidget(self.button_new_folder)
         self.button_copy_public_link = QtGui.QPushButton(self.frame_controls_right)
-        self.button_copy_public_link.setMinimumSize(QtCore.QSize(70, 62))
+        self.button_copy_public_link.setMinimumSize(QtCore.QSize(0, 62))
         self.button_copy_public_link.setObjectName("button_copy_public_link")
         self.verticalLayout_2.addWidget(self.button_copy_public_link)
         self.button_open_public_link = QtGui.QPushButton(self.frame_controls_right)
         font = QtGui.QFont()
-        font.setPointSize(16)
+        font.setPointSize(15)
         self.button_open_public_link.setFont(font)
         self.button_open_public_link.setObjectName("button_open_public_link")
         self.verticalLayout_2.addWidget(self.button_open_public_link)

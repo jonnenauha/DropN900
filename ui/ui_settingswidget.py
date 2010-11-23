@@ -2,8 +2,8 @@
 
 # Form implementation generated from reading ui file 'settingswidget.ui'
 #
-# Created: Sat Jul 31 00:50:54 2010
-#      by: PyQt4 UI code generator 4.6
+# Created: Tue Nov 23 03:27:49 2010
+#      by: PyQt4 UI code generator 4.7.2
 #
 # WARNING! All changes made in this file will be lost!
 
@@ -13,6 +13,10 @@ class Ui_SettingsWidget(object):
     def setupUi(self, SettingsWidget):
         SettingsWidget.setObjectName("SettingsWidget")
         SettingsWidget.resize(1009, 561)
+        SettingsWidget.setStyleSheet("QLineEdit {\n"
+"    background-color: white;\n"
+"    color: black;\n"
+"}")
         self.verticalLayout = QtGui.QVBoxLayout(SettingsWidget)
         self.verticalLayout.setSpacing(0)
         self.verticalLayout.setMargin(0)
@@ -23,7 +27,7 @@ class Ui_SettingsWidget(object):
         self.scrollArea.setWidgetResizable(True)
         self.scrollArea.setObjectName("scrollArea")
         self.scrollAreaWidgetContents = QtGui.QWidget(self.scrollArea)
-        self.scrollAreaWidgetContents.setGeometry(QtCore.QRect(0, -474, 988, 967))
+        self.scrollAreaWidgetContents.setGeometry(QtCore.QRect(0, 0, 991, 963))
         sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Expanding)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
@@ -45,6 +49,7 @@ class Ui_SettingsWidget(object):
         sizePolicy.setHeightForWidth(self.downloading_icon.sizePolicy().hasHeightForWidth())
         self.downloading_icon.setSizePolicy(sizePolicy)
         self.downloading_icon.setMinimumSize(QtCore.QSize(48, 84))
+        self.downloading_icon.setText("")
         self.downloading_icon.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft)
         self.downloading_icon.setObjectName("downloading_icon")
         self.horizontalLayout_4.addWidget(self.downloading_icon)
@@ -88,6 +93,7 @@ class Ui_SettingsWidget(object):
         self.download_layout.addWidget(self.lineedit_default_download_folder)
         self.button_browse_folder = QtGui.QPushButton(self.scrollAreaWidgetContents)
         self.button_browse_folder.setMinimumSize(QtCore.QSize(200, 65))
+        self.button_browse_folder.setStyleSheet("")
         self.button_browse_folder.setObjectName("button_browse_folder")
         self.download_layout.addWidget(self.button_browse_folder)
         self.main_layout.addLayout(self.download_layout)
@@ -105,6 +111,7 @@ class Ui_SettingsWidget(object):
         sizePolicy.setHeightForWidth(self.authentication_icon.sizePolicy().hasHeightForWidth())
         self.authentication_icon.setSizePolicy(sizePolicy)
         self.authentication_icon.setMinimumSize(QtCore.QSize(48, 84))
+        self.authentication_icon.setText("")
         self.authentication_icon.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft)
         self.authentication_icon.setObjectName("authentication_icon")
         self.horizontalLayout_5.addWidget(self.authentication_icon)
@@ -164,6 +171,7 @@ class Ui_SettingsWidget(object):
         sizePolicy.setHeightForWidth(self.sync_icon.sizePolicy().hasHeightForWidth())
         self.sync_icon.setSizePolicy(sizePolicy)
         self.sync_icon.setMinimumSize(QtCore.QSize(48, 84))
+        self.sync_icon.setText("")
         self.sync_icon.setAlignment(QtCore.Qt.AlignBottom|QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft)
         self.sync_icon.setObjectName("sync_icon")
         self.sync_title_layout.addWidget(self.sync_icon)

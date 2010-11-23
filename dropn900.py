@@ -3,8 +3,11 @@
 import sys
 import os
 
-from PyQt4.QtCore import QObject, QEvent
+""" Grazy hack to instantiate QApplication in PR 1.3 """
 from PyQt4.QtGui import QApplication
+singleton_app = QApplication(sys.argv)
+
+from PyQt4.QtCore import QObject, QEvent
 
 from dropbox import client, rest, auth
 from oauth import oauth
@@ -21,12 +24,9 @@ from transfers import SyncManager, TransferManager, TransferWidget
 
 """ Main programs controller, instantiates all the nessesary classes, starts ui and auth """
 
-class DropN900(QApplication):
+class DropN900():
 
-    def __init__(self, debug = False):
-        QApplication.__init__(self, sys.argv)
-        self.installEventFilter(self)
-        
+    def __init__(self, debug = False):       
         # Logger
         self.logger = Logger(debug)
 
@@ -65,7 +65,7 @@ class DropN900(QApplication):
         # Start by checking existing auth
         self.check_for_auth(self.datahandler.configpath("token.ini"))
         # Exec QApplication
-        os._exit(self.exec_())
+        os._exit(singleton_app.exec_())
                 
     def check_for_auth(self, filename):
         token_config = SafeConfigParser()

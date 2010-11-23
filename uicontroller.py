@@ -4,7 +4,7 @@ import os
 from PyQt4 import QtCore, QtGui, QtMaemo5
 from PyQt4.QtMaemo5 import QMaemo5InformationBox
 from PyQt4.QtCore import Qt, QString, QStringList, QTimer, QDir, QSize
-from PyQt4.QtGui import QMainWindow, QWidget, QDialog, QLabel, QTreeWidgetItem, QDesktopServices
+from PyQt4.QtGui import QMainWindow, QWidget, QDialog, QLabel, QTreeWidgetItem, QDesktopServices, QHeaderView
 from PyQt4.QtGui import QImage, QPixmap, QIcon, QImageReader, QMovie, QGridLayout, QSizePolicy, QPalette
 from PyQt4.QtGui import QInputDialog, QFileDialog, QMessageBox, QPushButton
 
@@ -39,6 +39,7 @@ class UiController:
         self.action_transfers = QtGui.QAction("Transfers", self.main_widget)
         self.action_settings = QtGui.QAction("Settings", self.main_widget)
         self.action_sync = QtGui.QAction("Synchronize", self.main_widget)
+        self.action_sync_photos = QtGui.QAction("Sync Media", self.main_widget)
         self.action_console = QtGui.QAction("Show Log", self.main_widget)
         self.action_about = QtGui.QAction("About", self.main_widget)
         self.action_exit = QtGui.QAction("Exit", self.main_widget)
@@ -46,6 +47,7 @@ class UiController:
         self.main_ui.menubar.addAction(self.action_transfers)
         self.main_ui.menubar.addAction(self.action_settings)
         self.main_ui.menubar.addAction(self.action_sync)
+        self.main_ui.menubar.addAction(self.action_sync_photos)
         self.main_ui.menubar.addAction(self.action_console)
         self.main_ui.menubar.addAction(self.action_about)
         self.main_ui.menubar.addAction(self.action_exit)
@@ -53,6 +55,7 @@ class UiController:
         # Connects
         self.action_transfers.triggered.connect(self.show_transfer_widget)
         self.action_sync.triggered.connect(self.synchronize_now)
+        self.action_sync_photos.triggered.connect(self.synchronize_now_photos)
         self.action_settings.triggered.connect(self.show_settings_widget)
         self.action_console.triggered.connect(self.show_console)
         self.action_about.triggered.connect(self.show_about)
@@ -149,6 +152,9 @@ class UiController:
         
     def synchronize_now(self):
         self.settings_widget.sync_now_clicked()
+        
+    def synchronize_now_photos(self):
+        self.controller.sync_manager.sync_media()
         
     def show(self):
         # Nokia N900 screen resolution, full screen
@@ -595,7 +601,8 @@ class TreeController:
         font.setPointSize(12)
         headers.setFont(0, font)
         headers.setFont(1, font)
-        headers.setSizeHint(0, QSize(350,25))
+        
+        self.tree.header().resizeSections(QHeaderView.ResizeToContents)
         
         # Click tracking
         self.clicked_items = {}
@@ -612,7 +619,6 @@ class TreeController:
         # Connects
         self.tree.itemSelectionChanged.connect(self.item_selection_changed)
         self.tree.itemClicked.connect(self.item_clicked)
-        #self.tree.itemDoubleClicked.connect(self.item_double_clicked)
         self.tree.itemExpanded.connect(self.item_expanded)
         self.tree.itemCollapsed.connect(self.item_collapsed)
 
@@ -626,9 +632,11 @@ class TreeController:
         self.tree.setCurrentItem(tree_item)
         self.folder_opened(tree_item)
         self.set_icon("folder_opened", tree_item)
+        self.tree.header().resizeSections(QHeaderView.ResizeToContents)
 
     def item_collapsed(self, tree_item):
         self.set_icon("folder", tree_item)
+        self.tree.header().resizeSections(QHeaderView.ResizeToContents)
         
     def set_root_folder(self, root_folder):
         self.tree.clear()
@@ -655,10 +663,13 @@ class TreeController:
 
         self.tree.setCurrentItem(root_item)
         self.start_load_anim(root_folder)
+        
+        self.tree.header().resizeSections(QHeaderView.ResizeToContents)
             
     def update_folder(self, path, folder):
         self.generate_children(folder)
         folder.tree_item.setExpanded(True)
+        self.tree.header().resizeSections(QHeaderView.ResizeToContents)
 
     def update_item(self, path, item):
         print "No handled yet really, why fetch metadata of a file?"
@@ -743,16 +754,14 @@ class TreeController:
             columns = QStringList()
             columns.append(item.get_name())
             columns.append(item.get_size())
- 
             # Create tree item
             child = QTreeWidgetItem(columns)
             child.setTextAlignment(1, Qt.AlignRight|Qt.AlignVCenter)
-
+            child.setFirstColumnSpanned(True)
             # Set icon with mime type, and folder indicator
             self.set_icon(item.mime_type, child)
             if item.is_folder():
                 child.setChildIndicatorPolicy(QTreeWidgetItem.ShowIndicator)
-
             # Set tree item to item data
             item.tree_item = child
 
@@ -798,15 +807,15 @@ class TreeController:
                 return
             # Create loading widget
             load_widget = QtGui.QLabel()
-            load_widget.resize(30,30)
-            load_widget.setMaximumSize(30,50)
+            load_widget.resize(50,50)
+            #load_widget.setMaximumSize(50,50)
             load_widget.setStyleSheet("QLabel { background-color: transparent; }")
 
             # Create animation
             load_anim = QMovie(self.datahandler.datapath("ui/images/loading_tree.gif"), "GIF", load_widget)
             load_anim.setCacheMode(QMovie.CacheAll)
             load_anim.setSpeed(150)
-            load_anim.setScaledSize(QtCore.QSize(30,30))
+            load_anim.setScaledSize(QtCore.QSize(50,50))
 
             # Add to data model and tree
             child.set_load_widget(load_widget, load_anim)

@@ -1,6 +1,17 @@
-dropn900-0.1.8-1 - 
-* Upload N900 camera folder content to dropbox path /N900Media
-* Confirmation options to sync both videos and photos or just photos or videos
+dropn900-0.1.8-1 - 23.11.2010
+* Sync upload/publish N900 camera folder content to dropbox path /N900Media/Photos and /N900Media/Videos
+* -> Confirmation options to sync both videos and photos or just photos or videos. 
+* -> .mp4 files are sorted to videos, everything else goes to photos. Subfolders in /home/user/MyDocs/DCIM are ignored.
+* -> Will ask to create n900 media folders if not present. Hard coded to /N900Media/Photos and /N900Media/Videos paths so if you dont accept you cant use this feature.
+* Fixed treeview column resizing bugs. Now auto resizes to content width every time treeview content changes.
+* Fixed line edits being black with black text, now white bg with black text as normal.
+* Made right side buttons a bit smaller with a bit smaller text, more space for horizontally long treeview item names.
+* Some style changes to make things looks normal again after PR 1.3
+* NOTE: Settings Sync Path selection button paint bug is known. Most likely wont show anything so you have trust what you insert in the popup when you press it. I guess QMaemo5ValueButton got twisted in PR 1.3, custom style sheets does not seem to do anything for this subclass of QPushButton.
+
+dropn900-0.1.7-2 - 02.11.2010
+* Fix PR 1.3 introduced bug: segfaults when initializing out QApplication instance.
+* Removed false import left when debugging the issue on build 1.
 
 dropn900-0.1.6-1 - 24.10.2010
 * Separate confirm dialogs for upload and download
