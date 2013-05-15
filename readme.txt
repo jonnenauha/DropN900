@@ -1,12 +1,15 @@
+2013 update
+===========
 
-NOTE: This was a hobby project of mine to try out Maemo5 development when I got the N900.
-      Since then Dropbox has deprecated the API version that this app is using, so DropN900
-      will not (should not at least) longer work for anyone.
-      
-      I Don't have any plans to update to the new API due to 1) N900 is no longer my main
-      phone 2) I don't have time for this project anymore.
-      
-      I'm sorry about this to all of the users this app gained over the years!
+This was a hobby project of mine to try out Maemo5 development when I got the N900.
+Since then Dropbox has deprecated the API version that this app is using, so DropN900
+will no longer work (should not at least).
+
+I don't have any plans to update to the new API due to 
+  1) N900 is no longer my main phone 
+  2) I don't have time for this project anymore due to work etc.
+
+I'm sorry about this to all of the users this app gained over the years!
 
 DropN900 - a maemo5 dropbox client
 ==================================
